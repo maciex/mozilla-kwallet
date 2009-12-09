@@ -1,6 +1,7 @@
 Version 0.3:
 
     * Correct information retrieval BUG
+    * Correct problem in platform description in rdf file
 
 Version 0.2:
 
