@@ -102,13 +102,27 @@ QString generateWalletKey( const nsAString & aHostname,
 			const nsAString & aActionURL,
 			const nsAString & aHttpRealm,
 			const nsAString & aUsername ) {
-	QString key = NS_ConvertUTF16toUTF8(aUsername).get();
+	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aUsername).get();
 	key += ",";
-	key += aActionURL.IsVoid() ? "" : NS_ConvertUTF16toUTF8(aActionURL).get();
+	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aActionURL).get();
 	key += ",";
-	key += aHttpRealm.IsVoid() ? "" : NS_ConvertUTF16toUTF8(aHttpRealm).get();
+	key += (aHttpRealm.IsVoid() || aHttpRealm.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aHttpRealm).get();
 	key += ",";
-	key += NS_ConvertUTF16toUTF8(aHostname).get();
+	key += (aHostname.IsVoid() || aHostname.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aHostname).get();
+	return key;
+}
+
+QString generateQueryWalletKey( const nsAString & aHostname,
+			const nsAString & aActionURL,
+			const nsAString & aHttpRealm,
+			const nsAString & aUsername ) {
+	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aUsername).get();
+	key += ",";
+	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aActionURL).get();
+	key += ",";
+	key += (aHttpRealm.IsVoid() || aHttpRealm.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aHttpRealm).get();
+	key += ",";
+	key += (aHostname.IsVoid() || aHostname.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aHostname).get();
 	return key;
 }
 
@@ -232,7 +246,7 @@ NS_IMETHODIMP KDEWallet::RemoveAllLogins() {
 		return NS_ERROR_FAILURE;
 	}
 	
-	QString key = generateWalletKey( NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), 
+	QString key = generateQueryWalletKey( NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), 
 					 NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ) );
 
 	QMap< QString, QMap< QString, QString > > entryMap;
@@ -265,7 +279,7 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 		return NS_ERROR_FAILURE;
 	}
 	
-	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
+	QString key = generateQueryWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
 
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 ) 
@@ -426,8 +440,9 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
 		return NS_ERROR_FAILURE;
 	}
 	
-	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
+	QString key = generateQueryWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
 
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() key: %s", key.toUtf8().data() ) );
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 ) 
 		return NS_OK;
