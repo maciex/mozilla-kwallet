@@ -11,11 +11,11 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Gnome Keyring password manager storage.
+ * The Original Code is KDE Wallet password manager storage.
  *
  * The Initial Developer of the Original Code is
- * Sylvain Pasche <sylvain.pasche@gmail.com>
- * Portions created by the Initial Developer are Copyright (C) 2007
+ * Guillermo Molina <guillermoadrianmolina@hotmail.com>
+ * Portions created by the Initial Developer are Copyright (C) 2009
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
@@ -35,9 +35,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsILoginManagerStorage.h"
-extern "C" {
-//#include "gnome-keyring.h"
-}
 
 #define KDEWALLET_CID \
 { 0xda355706, 0x2b26, 0x4682, { 0xbe, 0x76, 0xd6, 0x87, 0x13, 0x12, 0xd3, 0xa1}}

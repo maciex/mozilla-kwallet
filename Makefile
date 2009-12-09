@@ -1,12 +1,15 @@
 CXX   = g++
+#DEBUG_FLAGS = -DDEBUG
 CPPFLAGS +=     -fno-rtti              \
 		-fno-exceptions        \
 		-shared                \
                 -fPIC
 
 DEPENDENCY_CFLAGS = `pkg-config --cflags libxul libxul-unstable`
+#KDE_CFLAGS = -I/usr/include/kde
+KDE_LDFLAGS = -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul libxul-unstable`
-VERSION = 0.1a
+VERSION = 0.2
 FILES = KDEWallet.cpp 
 
 TARGET = libkdewallet.so
@@ -23,7 +26,7 @@ build-xpi: build-library
 	cd xpi && zip -r ../$(XPI_TARGET) *
 
 build-library: 
-	$(CXX) $(FILES) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(GECKO_DEFINES)
+	$(CXX) $(FILES) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS)
 	chmod +x $(TARGET)
 #	strip $(TARGET)
 
