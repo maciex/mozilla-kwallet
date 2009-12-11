@@ -98,17 +98,22 @@ nsAutoString QtString2NSString ( const QString &qtString ) {
 	return NS_ConvertUTF8toUTF16( qtString.toUtf8().data() );
 }
 
+QString NSString2QtString ( const nsAString & nsas ) {
+	nsAutoString nsautos(nsas);
+	return QString::fromUtf16(nsautos.get());
+}
+
 QString generateWalletKey( const nsAString & aHostname,
 			const nsAString & aActionURL,
 			const nsAString & aHttpRealm,
 			const nsAString & aUsername ) {
-	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aUsername).get();
+	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "" : NSString2QtString(aUsername);
 	key += ",";
-	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aActionURL).get();
+	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "" : NSString2QtString(aActionURL);
 	key += ",";
-	key += (aHttpRealm.IsVoid() || aHttpRealm.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aHttpRealm).get();
+	key += (aHttpRealm.IsVoid() || aHttpRealm.IsEmpty() ) ? "" : NSString2QtString(aHttpRealm);
 	key += ",";
-	key += (aHostname.IsVoid() || aHostname.IsEmpty() ) ? "" : NS_ConvertUTF16toUTF8(aHostname).get();
+	key += (aHostname.IsVoid() || aHostname.IsEmpty() ) ? "" : NSString2QtString(aHostname);
 	return key;
 }
 
@@ -116,13 +121,13 @@ QString generateQueryWalletKey( const nsAString & aHostname,
 			const nsAString & aActionURL,
 			const nsAString & aHttpRealm,
 			const nsAString & aUsername ) {
-	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aUsername).get();
+	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "*" : NSString2QtString(aUsername);
 	key += ",";
-	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aActionURL).get();
+	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "*" : NSString2QtString(aActionURL);
 	key += ",";
-	key += (aHttpRealm.IsVoid() || aHttpRealm.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aHttpRealm).get();
+	key += (aHttpRealm.IsVoid() || aHttpRealm.IsEmpty() ) ? "*" : NSString2QtString(aHttpRealm);
 	key += ",";
-	key += (aHostname.IsVoid() || aHostname.IsEmpty() ) ? "*" : NS_ConvertUTF16toUTF8(aHostname).get();
+	key += (aHostname.IsVoid() || aHostname.IsEmpty() ) ? "*" : NSString2QtString(aHostname);
 	return key;
 }
 
@@ -161,30 +166,30 @@ NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 
 	nsAutoString aUsername;
 	aLogin->GetUsername(aUsername);
-	entry[ kUsernameAttr ] = NS_ConvertUTF16toUTF8(aUsername).get();
+	entry[ kUsernameAttr ] = NSString2QtString(aUsername);
 	
 	aLogin->GetPassword(s);
-	entry[ kPasswordAttr ] = NS_ConvertUTF16toUTF8(s).get();
+	entry[ kPasswordAttr ] = NSString2QtString(s);
 	
 	aLogin->GetUsernameField(s);
-	entry[ kUsernameFieldAttr ] = NS_ConvertUTF16toUTF8(s).get();
+	entry[ kUsernameFieldAttr ] = NSString2QtString(s);
 	
 	aLogin->GetPasswordField(s);
-	entry[ kPasswordFieldAttr ] = NS_ConvertUTF16toUTF8(s).get();
+	entry[ kPasswordFieldAttr ] = NSString2QtString(s);
 	
 	nsAutoString aActionURL;
 	aLogin->GetFormSubmitURL(aActionURL);
 	if( !aActionURL.IsVoid() )
-		entry[ kFormSubmitURLAttr ] = NS_ConvertUTF16toUTF8(aActionURL).get();
+		entry[ kFormSubmitURLAttr ] = NSString2QtString(aActionURL);
 	
 	nsAutoString aHttpRealm;
 	aLogin->GetHttpRealm(aHttpRealm);
 	if( !aHttpRealm.IsVoid() )
-		entry[ kHttpRealmAttr ] = NS_ConvertUTF16toUTF8(aHttpRealm).get();
+		entry[ kHttpRealmAttr ] = NSString2QtString(aHttpRealm);
 
 	nsAutoString aHostname;
 	aLogin->GetHostname(aHostname);
-	entry[ kHostnameAttr ] = NS_ConvertUTF16toUTF8(aHostname).get();
+	entry[ kHostnameAttr ] = NSString2QtString(aHostname);
 
 	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
 	if( wallet->writeMap( key, entry ) ) {
@@ -391,7 +396,7 @@ NS_IMETHODIMP KDEWallet::GetLoginSavingEnabled(const nsAString & aHost,
 	wallet->readMap( kSaveDisabledHostsMapName, saveDisabledHostMap );
 
 	*_retval = true;
-	if( saveDisabledHostMap.contains( NS_ConvertUTF16toUTF8(aHost).get() ) )
+	if( saveDisabledHostMap.contains(  NSString2QtString(aHost) ) )
 		*_retval = false;
 	
 	if( *_retval )
@@ -414,14 +419,14 @@ NS_IMETHODIMP KDEWallet::SetLoginSavingEnabled(const nsAString & aHost,
 
 	wallet->readMap( kSaveDisabledHostsMapName, saveDisabledHostMap );
 	if( isEnabled ) { //Remove form disabled list, if it is there
-		if( saveDisabledHostMap.contains( NS_ConvertUTF16toUTF8(aHost).get() ) )
-			if( saveDisabledHostMap.remove( NS_ConvertUTF16toUTF8(aHost).get() ) != 1 ) {
+		if( saveDisabledHostMap.contains( NSString2QtString(aHost) ) )
+			if( saveDisabledHostMap.remove( NSString2QtString(aHost) ) != 1 ) {
 				NS_ERROR("Can not remove save map information");
 				return NS_ERROR_FAILURE;
 			}
 	}
 	else 	// Add to disabled list
-		saveDisabledHostMap[ NS_ConvertUTF16toUTF8(aHost).get() ] = "TRUE";
+		saveDisabledHostMap[ NSString2QtString(aHost) ] = "TRUE";
 	if( wallet->writeMap( kSaveDisabledHostsMapName, saveDisabledHostMap ) ) {
 		NS_ERROR("Can not save map information");
 		return NS_ERROR_FAILURE;

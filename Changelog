@@ -1,3 +1,7 @@
+Version 0.4:
+
+    * Correct problem saving non UTF8 passwords
+
 Version 0.3:
 
     * Correct information retrieval BUG
