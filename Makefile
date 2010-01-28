@@ -1,5 +1,5 @@
 CXX   = g++
-#DEBUG_FLAGS = -DDEBUG
+DEBUG_FLAGS = -DDEBUG
 CPPFLAGS +=     -fno-rtti              \
 		-fno-exceptions        \
 		-shared                \
@@ -9,7 +9,7 @@ DEPENDENCY_CFLAGS = `pkg-config --cflags libxul libxul-unstable`
 #KDE_CFLAGS = -I/usr/include/kde
 KDE_LDFLAGS = -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul libxul-unstable`
-VERSION = 0.4
+VERSION = 0.5
 FILES = KDEWallet.cpp 
 
 TARGET = libkdewallet.so

@@ -1,3 +1,7 @@
+Version 0.5:
+
+    * Add standard storage support (compatibility with KDE apps)
+
 Version 0.4:
 
     * Correct problem saving non UTF8 passwords

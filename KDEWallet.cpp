@@ -79,17 +79,17 @@ const char *kPasswordAttr = "password";
 /* Implementation file */
 NS_IMPL_ISUPPORTS1(KDEWallet, nsILoginManagerStorage)
 
-bool checkWallet() {
+static bool checkWallet( const char *folder = "Firefox" ) {
 	if( !wallet ) {
 		wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous );
 		if( !wallet )
 			return false;
 	}
-	if( !wallet->hasFolder("Firefox") ) {
-		if( !wallet->createFolder("Firefox") ) 
+	if( !wallet->hasFolder(folder) ) {
+		if( !wallet->createFolder(folder) ) 
 			return false;
 	}
-	if( !wallet->setFolder("Firefox") )
+	if( !wallet->setFolder(folder) )
 		return false;
 	return true;
 }
@@ -272,24 +272,242 @@ NS_IMETHODIMP KDEWallet::RemoveAllLogins() {
 	return NS_OK;
 }
 
-NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
-                                       const nsAString & aHostname,
-                                       const nsAString & aActionURL,
-                                       const nsAString & aHttpRealm,
-                                       nsILoginInfo ***logins) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Called") );
+
+NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname, 
+                                        const nsAString & aHttpRealm,
+                                        PRUint32 *_retval) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() Called") );
+
+	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+		return NS_ERROR_FAILURE;
+	
+	QString key = NSString2QtString(aHostname);
+	
+	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
+	
+	if( !key.contains(":") )
+		key += ":-1"; //I think this is a bug, it should be :80 or whatever
+	
+	if( aHttpRealm.IsVoid() )
+		return NS_ERROR_FAILURE;
+	
+	if( key.startsWith( "http" ) ) {
+		key += "-";
+		key += NSString2QtString(aHttpRealm);
+	}
+	
+	nsAutoString temp = QtString2NSString( key );	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+	
+	if( !checkWallet( "Passwords" ) ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+		
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 ) 
+		return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() Found %d maps", entryMap.count() ) );
+	if( entryMap.count() == 0 ) 
+		return NS_OK;
+
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+	int i = 0;
+	while (iterator.hasNext()) {
+		iterator.next();
+		
+		temp = QtString2NSString( iterator.key() );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+ 		QMap< QString, QString > entry = iterator.value();			
+		QMapIterator< QString, QString > entriesIterator(entry);
+		while (entriesIterator.hasNext()) {
+			entriesIterator.next();
+			if( entriesIterator.key().startsWith("login") ) {
+				QString passEntry = "password";
+				if( entriesIterator.key().size() > 5 ) // eg: login-2, login-3, etc
+					passEntry += entriesIterator.key().mid(5); // eg: password-2, password-3, etc
+								
+				temp = QtString2NSString( entriesIterator.key() );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() login key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+				temp = QtString2NSString( entriesIterator.value() );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() login: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+				temp = QtString2NSString( passEntry );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() password key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );			
+				
+				if( entry.contains( passEntry ) ) {
+					temp = QtString2NSString( entry.value( passEntry ) );
+					PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() password: %s", NS_ConvertUTF16toUTF8(temp).get() ) );			
+					
+					i++;
+				}
+			}
+		}
+		
+	}	
+	*_retval = i;
+	return NS_OK;
+}
+
+NS_IMETHODIMP CountFormLogins(const nsAString & aHostname, 
+                                        const nsAString & aHttpRealm,
+                                        PRUint32 *_retval) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Called") );
+	*_retval = 0;
+	if( !checkWallet() ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+	
+	QString key = generateQueryWalletKey( aHostname, NS_ConvertUTF8toUTF16( "" ), aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() key: %s", key.toUtf8().data() ) );
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 ) 
+		return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d maps", entryMap.count() ) );
+	*_retval = entryMap.count();
+	return NS_OK;
+}
+
+NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname, 
+                                        const nsAString & aActionURL,
+                                        const nsAString & aHttpRealm,
+                                        PRUint32 *_retval) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() Called") );
+	
+	if( aActionURL.IsVoid() )
+		return CountRealmLogins( aHostname, aHttpRealm, _retval );
+	
+	if( aHttpRealm.IsVoid() )
+		return CountFormLogins( aHostname, aActionURL, _retval );
+
+	NS_ERROR("CountLogins must set aActionURL or aHttpRealm");
+	return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
+				const nsAString & aHostname,
+				const nsAString & aHttpRealm,
+				nsILoginInfo ***logins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() Called") );
+	
+	NS_IMETHODIMP retVal = CountRealmLogins( aHostname, aHttpRealm, count );
+	if( retVal != NS_OK )
+		return retVal;
+	
+	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( *count * sizeof(nsILoginInfo*));
+	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
+	memset(array, 0, *count * sizeof(nsILoginInfo*));
+
+	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+		return NS_ERROR_FAILURE;
+	
+	QString key = NSString2QtString(aHostname);
+	
+	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
+	
+	if( !key.contains(":") )
+		key += ":-1"; //I think this is a bug, it should be :80 or whatever
+	
+	if( aHttpRealm.IsVoid() )
+		return NS_ERROR_FAILURE;
+	
+	if( key.startsWith( "http" ) ) {
+		key += "-";
+		key += NSString2QtString(aHttpRealm);
+	}
+	
+	nsAutoString temp = QtString2NSString( key );	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+	
+	if( !checkWallet( "Passwords" ) ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+		
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 ) 
+		return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() Found %d maps", entryMap.count() ) );
+	if( entryMap.count() == 0 ) 
+		return NS_OK;
+
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+	int i = 0;
+	while (iterator.hasNext()) {
+		iterator.next();
+		
+		temp = QtString2NSString( iterator.key() );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+ 		QMap< QString, QString > entry = iterator.value();			
+		QMapIterator< QString, QString > entriesIterator(entry);
+		while (entriesIterator.hasNext()) {
+			entriesIterator.next();
+			if( entriesIterator.key().startsWith("login") ) {
+				QString passEntry = "password";
+				if( entriesIterator.key().size() > 5 ) // eg: login-2, login-3, etc
+					passEntry += entriesIterator.key().mid(5); // eg: password-2, password-3, etc
+								
+				temp = QtString2NSString( entriesIterator.key() );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() login key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+				temp = QtString2NSString( entriesIterator.value() );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() login: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+				temp = QtString2NSString( passEntry );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() password key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );			
+				
+				if( entry.contains( passEntry ) ) {
+					temp = QtString2NSString( entry.value( passEntry ) );
+					PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() password: %s", NS_ConvertUTF16toUTF8(temp).get() ) );			
+
+					nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
+					if (!loginInfo)
+						return NS_ERROR_FAILURE;
+					
+					loginInfo->SetHostname( aHostname );
+					loginInfo->SetHttpRealm( aHttpRealm );
+					loginInfo->SetUsername(QtString2NSString( entriesIterator.value() ) );
+					loginInfo->SetPassword(QtString2NSString( entry.value( passEntry ) ) );
+					
+					NS_ADDREF(loginInfo);
+					array[i] = loginInfo;
+
+					i++;
+				}
+			}
+		}		
+	}	
+	if( (int)*count != i ) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() something went wrong while counting passswords" ) );			
+		return NS_ERROR_FAILURE;
+	}
+	
+	*logins = array;
+	return NS_OK;
+}
+
+NS_IMETHODIMP FindFormLogins(PRUint32 *count,
+				const nsAString & aHostname,
+				const nsAString & aActionURL,
+				nsILoginInfo ***logins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Called") );
 	*count = 0;
 	if( !checkWallet() ) {
 		NS_ERROR("Wallet is useless");
 		return NS_ERROR_FAILURE;
 	}
 	
-	QString key = generateQueryWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
+	QString key = generateQueryWalletKey( aHostname, aActionURL, NS_ConvertUTF8toUTF16( "" ), NS_ConvertUTF8toUTF16( "*" ) );
 
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 ) 
 		return NS_OK;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Found %d maps", entryMap.count() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d maps", entryMap.count() ) );
 	if( entryMap.count() == 0 ) 
 		return NS_OK;
 	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc(entryMap.count() * sizeof(nsILoginInfo*));
@@ -328,8 +546,27 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 	return NS_OK;
 }
 
+NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
+                                       const nsAString & aHostname,
+                                       const nsAString & aActionURL,
+                                       const nsAString & aHttpRealm,
+                                       nsILoginInfo ***logins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Called") );
+	
+	if( aActionURL.IsVoid() )
+		return FindRealmLogins( count, aHostname, aHttpRealm, logins );
+	
+	if( aHttpRealm.IsVoid() )
+		return FindFormLogins( count, aHostname, aActionURL, logins );
+
+	NS_ERROR("FindLogins must set aActionURL or aHttpRealm");
+	return NS_ERROR_FAILURE;
+}
+
 NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins) {
-	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
+  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() unimplemented") );
+  return NS_ERROR_NOT_IMPLEMENTED;
+//	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
 }
 
 NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *count,
@@ -342,7 +579,7 @@ NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *count,
 
 NS_IMETHODIMP KDEWallet::GetAllEncryptedLogins(unsigned int*,
                                                   nsILoginInfo***) {
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllEncryptedLogins() Called") );
+  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllEncryptedLogins() unimplemented") );
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
@@ -431,28 +668,6 @@ NS_IMETHODIMP KDEWallet::SetLoginSavingEnabled(const nsAString & aHost,
 		NS_ERROR("Can not save map information");
 		return NS_ERROR_FAILURE;
 	}
-	return NS_OK;
-}
-
-NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname, 
-                                        const nsAString & aActionURL,
-                                        const nsAString & aHttpRealm,
-                                        PRUint32 *_retval) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() Called") );
-	*_retval = 0;
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
-	
-	QString key = generateQueryWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
-
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() key: %s", key.toUtf8().data() ) );
-	QMap< QString, QMap< QString, QString > > entryMap;
-	if( wallet->readMapList( key, entryMap ) != 0 ) 
-		return NS_OK;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() Found %d maps", entryMap.count() ) );
-	*_retval = entryMap.count();
 	return NS_OK;
 }
 
