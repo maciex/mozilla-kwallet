@@ -131,6 +131,55 @@ QString generateQueryWalletKey( const nsAString & aHostname,
 	return key;
 }
 
+NS_IMETHODIMP generateRealmWalletKey(  const nsAString & aHostname,
+			const nsAString & aHttpRealm,
+			QString & key) {
+	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+		return NS_ERROR_FAILURE;
+
+	key = NSString2QtString(aHostname);
+
+	key.replace( "://", "-" );
+
+	if( !key.contains(":") )
+		key += ":-1"; //I think this is a bug, it should be :80 or whatever
+
+	if( aHttpRealm.IsVoid() )
+		return NS_ERROR_FAILURE;
+
+	if( key.startsWith( "http" ) ) {
+		key += "-";
+		key += NSString2QtString(aHttpRealm);
+	}
+
+	return NS_OK;
+}
+
+NS_IMETHODIMP generateRealmQueryWalletKey(  const nsAString & aHostname,
+			const nsAString & aHttpRealm,
+			QString & key) {
+	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+		return NS_ERROR_FAILURE;
+
+	key = NSString2QtString(aHostname);
+
+	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
+
+	if( !key.contains(":") )
+		key += ":*"; //I think this is a bug, it should be :80 or whatever
+
+	if( aHttpRealm.IsVoid() )
+		return NS_ERROR_FAILURE;
+
+	if( key.startsWith( "http" ) ) {
+		key += "-";
+		key += NSString2QtString(aHttpRealm);
+	}
+
+	return NS_OK;
+}
+
+
 NS_IMETHODIMP KDEWallet::Init() {
 	gKDEWalletLog = PR_NewLogModule("KDEWalletLog");
 
@@ -154,146 +203,16 @@ NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
     return Init();
 }
 
-NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
-  
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
-	nsAutoString s;
-	QMap< QString, QString > entry;
-
-	nsAutoString aUsername;
-	aLogin->GetUsername(aUsername);
-	entry[ kUsernameAttr ] = NSString2QtString(aUsername);
-	
-	aLogin->GetPassword(s);
-	entry[ kPasswordAttr ] = NSString2QtString(s);
-	
-	aLogin->GetUsernameField(s);
-	entry[ kUsernameFieldAttr ] = NSString2QtString(s);
-	
-	aLogin->GetPasswordField(s);
-	entry[ kPasswordFieldAttr ] = NSString2QtString(s);
-	
-	nsAutoString aActionURL;
-	aLogin->GetFormSubmitURL(aActionURL);
-	if( !aActionURL.IsVoid() )
-		entry[ kFormSubmitURLAttr ] = NSString2QtString(aActionURL);
-	
-	nsAutoString aHttpRealm;
-	aLogin->GetHttpRealm(aHttpRealm);
-	if( !aHttpRealm.IsVoid() )
-		entry[ kHttpRealmAttr ] = NSString2QtString(aHttpRealm);
-
-	nsAutoString aHostname;
-	aLogin->GetHostname(aHostname);
-	entry[ kHostnameAttr ] = NSString2QtString(aHostname);
-
-	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
-	if( wallet->writeMap( key, entry ) ) {
-		NS_ERROR("Can not save map information");
-		return NS_ERROR_FAILURE;
-	}
-	return NS_OK;
-}
-
-NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveLogin() Called") );
-  
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
-
-	nsAutoString aUsername;
-	aLogin->GetUsername(aUsername);
-	nsAutoString aActionURL;
-	aLogin->GetFormSubmitURL(aActionURL);
-	nsAutoString aHttpRealm;
-	aLogin->GetHttpRealm(aHttpRealm);
-	nsAutoString aHostname;
-	aLogin->GetHostname(aHostname);
-
-	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
-	if( wallet->removeEntry( key ) ) {
-		NS_ERROR("Can not remove correctly map information");
-		return NS_ERROR_FAILURE;
-	}
-	return NS_OK;
-}
-
-NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
-                                        nsISupports *modLogin) {
-  /* If the second argument is an nsILoginInfo, 
-   * just remove the old login and add the new one */
-
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() Called") );
-  nsresult interfaceok;
-  nsCOMPtr<nsILoginInfo> newLogin( do_QueryInterface(modLogin, &interfaceok) );
-  if (interfaceok == NS_OK) {
-    nsresult rv = RemoveLogin(oldLogin);
-    rv |= AddLogin(newLogin);
-  return rv;
-  } /* Otherwise, it has to be an nsIPropertyBag.
-     * Let's get the attributes from the old login, then append the ones 
-     * fetched from the property bag. Gracefully, if an attribute appears
-     * twice in an attribut list, the last value is stored. */
-  return NS_OK;
-}
- 
-
-NS_IMETHODIMP KDEWallet::RemoveAllLogins() {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() Called") );
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
-	
-	QString key = generateQueryWalletKey( NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), 
-					 NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ) );
-
-	QMap< QString, QMap< QString, QString > > entryMap;
-	if( wallet->readMapList( key, entryMap ) != 0 ) 
-		return NS_OK;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() Found %d maps", entryMap.count() ) );
-	if( entryMap.count() == 0 ) 
-		return NS_OK;
-
-	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
-	while (iterator.hasNext()) {
-		iterator.next();
-		if( wallet->removeEntry( iterator.key() ) ) {
-			NS_ERROR("Can not remove correctly map information");
-			return NS_ERROR_FAILURE;
-		}		
-	}	
-	return NS_OK;
-}
-
-
 NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname, 
                                         const nsAString & aHttpRealm,
                                         PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() Called") );
 
-	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+	QString key;
+
+	if( generateRealmQueryWalletKey( aHostname, aHttpRealm, key ) != NS_OK ) {
+		NS_ERROR("Error in login info");
 		return NS_ERROR_FAILURE;
-	
-	QString key = NSString2QtString(aHostname);
-	
-	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
-	
-	if( !key.contains(":") )
-		key += ":-1"; //I think this is a bug, it should be :80 or whatever
-	
-	if( aHttpRealm.IsVoid() )
-		return NS_ERROR_FAILURE;
-	
-	if( key.startsWith( "http" ) ) {
-		key += "-";
-		key += NSString2QtString(aHttpRealm);
 	}
 	
 	nsAutoString temp = QtString2NSString( key );	
@@ -347,6 +266,9 @@ NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname,
 		}
 		
 	}	
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() Found %d logins", i ) );
+
 	*_retval = i;
 	return NS_OK;
 }
@@ -367,7 +289,7 @@ NS_IMETHODIMP CountFormLogins(const nsAString & aHostname,
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 ) 
 		return NS_OK;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d maps", entryMap.count() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d logins", entryMap.count() ) );
 	*_retval = entryMap.count();
 	return NS_OK;
 }
@@ -388,6 +310,295 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
 	return NS_ERROR_FAILURE;
 }
 
+NS_IMETHODIMP AddRealmLogin(nsILoginInfo *aLogin) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddRealmLogin() Called") );
+	
+	nsAutoString aHostname;
+	aLogin->GetHostname(aHostname);
+	nsAutoString aHttpRealm;
+	aLogin->GetHttpRealm(aHttpRealm);
+	QString key;
+
+	if( generateRealmWalletKey( aHostname, aHttpRealm, key ) != NS_OK ) {
+		NS_ERROR("Error in login info");
+		return NS_ERROR_FAILURE;
+	}
+	
+	nsAutoString temp = QtString2NSString( key );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+	
+	if( !checkWallet( "Passwords" ) ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+
+	QMap< QString, QString > entry;
+	wallet->readMap( key, entry );
+
+	QString passwordField( "password" );
+	QString s;
+
+	/* Find first available entry of type password-num */
+	int numEntry = 0;
+	while( entry.contains( passwordField ) ) {
+		numEntry++;
+		s = QString( "-%1" ).arg( numEntry );
+		passwordField = "password" + s;
+	}
+
+	/* Prepare the login field with the same entry */
+	QString loginField( "login" );
+	loginField += s;
+
+	nsAutoString aUsername;
+	aLogin->GetUsername(aUsername);
+	entry[ loginField ] = NSString2QtString(aUsername);
+
+	nsAutoString aPassword;
+	aLogin->GetPassword(aPassword);
+	entry[ passwordField ] = NSString2QtString(aPassword);
+		
+	if( wallet->writeMap( key, entry ) ) {
+		NS_ERROR("Can not save map information");
+		return NS_ERROR_FAILURE;
+	}
+	return NS_OK;
+}
+
+NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() Called") );
+  
+	if( !checkWallet() ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+	nsAutoString s;
+	QMap< QString, QString > entry;
+
+	nsAutoString aUsername;
+	aLogin->GetUsername(aUsername);
+	entry[ kUsernameAttr ] = NSString2QtString(aUsername);
+	
+	aLogin->GetPassword(s);
+	entry[ kPasswordAttr ] = NSString2QtString(s);
+	
+	aLogin->GetUsernameField(s);
+	entry[ kUsernameFieldAttr ] = NSString2QtString(s);
+	
+	aLogin->GetPasswordField(s);
+	entry[ kPasswordFieldAttr ] = NSString2QtString(s);
+	
+	nsAutoString aActionURL;
+	aLogin->GetFormSubmitURL(aActionURL);
+	if( !aActionURL.IsVoid() )
+		entry[ kFormSubmitURLAttr ] = NSString2QtString(aActionURL);
+	
+	nsAutoString aHttpRealm;
+	aLogin->GetHttpRealm(aHttpRealm);
+	if( !aHttpRealm.IsVoid() )
+		entry[ kHttpRealmAttr ] = NSString2QtString(aHttpRealm);
+
+	nsAutoString aHostname;
+	aLogin->GetHostname(aHostname);
+	entry[ kHostnameAttr ] = NSString2QtString(aHostname);
+
+	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
+	if( wallet->writeMap( key, entry ) ) {
+		NS_ERROR("Can not save map information");
+		return NS_ERROR_FAILURE;
+	}
+	return NS_OK;
+}
+
+NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
+	
+	nsAutoString aActionURL;
+	aLogin->GetFormSubmitURL(aActionURL);
+	if( aActionURL.IsVoid() )
+		return AddRealmLogin( aLogin );
+	
+	nsAutoString aHttpRealm;
+	aLogin->GetHttpRealm(aHttpRealm);
+	if( aHttpRealm.IsVoid() )
+		return AddFormLogin( aLogin );
+
+	NS_ERROR("AddLogin must set aActionURL or aHttpRealm");
+	return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP RemoveRealmLogin(nsILoginInfo *aLogin) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() Called") );
+
+	nsAutoString aHostname;
+	aLogin->GetHostname(aHostname);
+	nsAutoString aHttpRealm;
+	aLogin->GetHttpRealm(aHttpRealm);
+
+	QString key;
+
+	if( generateRealmQueryWalletKey( aHostname, aHttpRealm, key ) != NS_OK ) {
+		NS_ERROR("Error in login info");
+		return NS_ERROR_FAILURE;
+	}
+
+	nsAutoString temp = QtString2NSString( key );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+	if( !checkWallet( "Passwords" ) ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 )
+		return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() Found %d maps", entryMap.count() ) );
+	if( entryMap.count() == 0 )
+		return NS_OK;
+
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+
+	nsAutoString aUsername;
+	aLogin->GetUsername(aUsername);
+	QString username =  NSString2QtString(aUsername);
+	nsAutoString aPassword;
+	aLogin->GetPassword(aPassword);
+	QString password = NSString2QtString(aPassword);
+
+	while (iterator.hasNext()) {
+		iterator.next();
+
+		temp = QtString2NSString( iterator.key() );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+ 		QMap< QString, QString > entry = iterator.value();
+
+		QString usernameField = entry.key( username );
+		if( !usernameField.isEmpty() ) {
+			temp = QtString2NSString( usernameField );
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() login key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+			QString passwordField = "password";
+			if( usernameField.startsWith("login") && usernameField.size() > 5 )
+				passwordField += usernameField.mid(5); // eg: password-2, password-3, etc
+
+			temp = QtString2NSString( passwordField );
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() password key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
+
+			if( entry.value( passwordField ) == password ) {
+				entry.remove( usernameField );
+				entry.remove( passwordField );
+				if( entry.isEmpty() ) {
+					if( wallet->removeEntry( iterator.key() ) ) {
+						NS_ERROR("Can not remove correctly map information");
+						return NS_ERROR_FAILURE;
+					}
+				}
+				else {
+					if( wallet->writeMap( iterator.key(), entry ) ) {
+						NS_ERROR("Can not save map information");
+						return NS_ERROR_FAILURE;
+					}
+				}
+				return NS_OK;
+			}
+		}
+	}
+
+	return NS_OK;
+}
+
+NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Called") );
+  
+	if( !checkWallet() ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+
+	nsAutoString aUsername;
+	aLogin->GetUsername(aUsername);
+	nsAutoString aActionURL;
+	aLogin->GetFormSubmitURL(aActionURL);
+	nsAutoString aHttpRealm;
+	aLogin->GetHttpRealm(aHttpRealm);
+	nsAutoString aHostname;
+	aLogin->GetHostname(aHostname);
+
+	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
+	if( wallet->removeEntry( key ) ) {
+		NS_ERROR("Can not remove correctly map information");
+		return NS_ERROR_FAILURE;
+	}
+	return NS_OK;
+}
+
+NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveLogin() Called") );
+
+	nsAutoString aActionURL;
+	aLogin->GetFormSubmitURL(aActionURL);
+	if( aActionURL.IsVoid() )
+		return RemoveRealmLogin( aLogin );
+
+	nsAutoString aHttpRealm;
+	aLogin->GetHttpRealm(aHttpRealm);
+	if( aHttpRealm.IsVoid() )
+		return RemoveFormLogin( aLogin );
+
+	NS_ERROR("RemoveLogin must set aActionURL or aHttpRealm");
+	return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
+                                        nsISupports *modLogin) {
+  /* If the second argument is an nsILoginInfo, 
+   * just remove the old login and add the new one */
+
+  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() Called") );
+  nsresult interfaceok;
+  nsCOMPtr<nsILoginInfo> newLogin( do_QueryInterface(modLogin, &interfaceok) );
+  if (interfaceok == NS_OK) {
+    nsresult rv = RemoveLogin(oldLogin);
+    rv |= AddLogin(newLogin);
+  return rv;
+  } /* Otherwise, it has to be an nsIPropertyBag.
+     * Let's get the attributes from the old login, then append the ones 
+     * fetched from the property bag. Gracefully, if an attribute appears
+     * twice in an attribut list, the last value is stored. */
+  return NS_OK;
+}
+ 
+
+NS_IMETHODIMP KDEWallet::RemoveAllLogins() {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() Called") );
+	if( !checkWallet() ) {
+		NS_ERROR("Wallet is useless");
+		return NS_ERROR_FAILURE;
+	}
+	
+	QString key = generateQueryWalletKey( NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), 
+					 NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ) );
+
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 ) 
+		return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() Found %d maps", entryMap.count() ) );
+	if( entryMap.count() == 0 ) 
+		return NS_OK;
+
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+	while (iterator.hasNext()) {
+		iterator.next();
+		if( wallet->removeEntry( iterator.key() ) ) {
+			NS_ERROR("Can not remove correctly map information");
+			return NS_ERROR_FAILURE;
+		}		
+	}	
+	return NS_OK;
+}
+
 NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 				const nsAString & aHostname,
 				const nsAString & aHttpRealm,
@@ -402,32 +613,16 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
 	memset(array, 0, *count * sizeof(nsILoginInfo*));
 
-	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+	QString key;
+
+	if( generateRealmQueryWalletKey( aHostname, aHttpRealm, key ) != NS_OK ) {
+		NS_ERROR("Error in login info");
 		return NS_ERROR_FAILURE;
-	
-	QString key = NSString2QtString(aHostname);
-	
-	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
-	
-	if( !key.contains(":") )
-		key += ":-1"; //I think this is a bug, it should be :80 or whatever
-	
-	if( aHttpRealm.IsVoid() )
-		return NS_ERROR_FAILURE;
-	
-	if( key.startsWith( "http" ) ) {
-		key += "-";
-		key += NSString2QtString(aHttpRealm);
 	}
 	
 	nsAutoString temp = QtString2NSString( key );	
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
-	
-	if( !checkWallet( "Passwords" ) ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
-		
+			
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 ) 
 		return NS_OK;
@@ -443,6 +638,28 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 		temp = QtString2NSString( iterator.key() );
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
 
+		QStringList keyParts = iterator.key().split( "-" );
+		QString hostname = keyParts[0] + "://" + keyParts[1];
+		QString httpRealm;
+		int first = 2;
+		if( hostname.endsWith( ":" ) ) { // http-something:-1-Realm
+			hostname.truncate( hostname.size()-1 );
+			first = 3;
+		} 
+
+		if( hostname.startsWith( "http" ) ) {
+			httpRealm = keyParts[ first ];
+			for( int i = first + 1; i < keyParts.size(); i++ ) {
+				httpRealm += "-";
+				httpRealm += keyParts[ i ];
+			}
+		}
+
+		if( !checkWallet( "Passwords" ) ) {
+			NS_ERROR("Wallet is useless");
+			return NS_ERROR_FAILURE;
+		}
+		
  		QMap< QString, QString > entry = iterator.value();			
 		QMapIterator< QString, QString > entriesIterator(entry);
 		while (entriesIterator.hasNext()) {
@@ -468,9 +685,9 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 					nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
 					if (!loginInfo)
 						return NS_ERROR_FAILURE;
-					
-					loginInfo->SetHostname( aHostname );
-					loginInfo->SetHttpRealm( aHttpRealm );
+
+					loginInfo->SetHostname( QtString2NSString( hostname ) );
+					loginInfo->SetHttpRealm( QtString2NSString( httpRealm ) );
 					loginInfo->SetUsername(QtString2NSString( entriesIterator.value() ) );
 					loginInfo->SetPassword(QtString2NSString( entry.value( passEntry ) ) );
 					
@@ -481,7 +698,8 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 				}
 			}
 		}		
-	}	
+	}
+	
 	if( (int)*count != i ) {
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindRealmLogins() something went wrong while counting passswords" ) );			
 		return NS_ERROR_FAILURE;
@@ -555,7 +773,7 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 	
 	if( aActionURL.IsVoid() )
 		return FindRealmLogins( count, aHostname, aHttpRealm, logins );
-	
+
 	if( aHttpRealm.IsVoid() )
 		return FindFormLogins( count, aHostname, aActionURL, logins );
 
@@ -564,9 +782,47 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 }
 
 NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins) {
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() unimplemented") );
-  return NS_ERROR_NOT_IMPLEMENTED;
-//	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
+
+	PRUint32 realmCount;
+	nsILoginInfo **realmLogins;
+	if( FindRealmLogins( &realmCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &realmLogins  ) != NS_OK ) {
+		NS_ERROR("Get Realm Logins failed");
+		return NS_ERROR_FAILURE;
+	}
+
+	PRUint32 formCount;
+	nsILoginInfo **formLogins;
+	if( FindFormLogins( &formCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &formLogins  ) != NS_OK ) {
+		NS_ERROR("Get Form Logins failed");
+		return NS_ERROR_FAILURE;
+	}
+
+	if( formCount == 0 ) {// Just Realm logins
+		*aCount = realmCount;
+		*aLogins = realmLogins;
+		return NS_OK;
+	}
+
+	if( realmCount == 0 ) { // Just Form logins
+		*aCount = formCount;
+		*aLogins = formLogins;
+		return NS_OK;
+	}
+
+	//Both Realm and form logins, have to join them
+	
+	PRUint32 count = realmCount + formCount;
+	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( count * sizeof(nsILoginInfo*));
+	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
+	memcpy(array, realmLogins, realmCount * sizeof(nsILoginInfo*));
+	nsMemory::Free( realmLogins );
+	memcpy(array + realmCount, formLogins, formCount * sizeof(nsILoginInfo*));
+	nsMemory::Free( formLogins );
+	
+	*aCount = count;
+	*aLogins = array;
+	return NS_OK;
 }
 
 NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *count,

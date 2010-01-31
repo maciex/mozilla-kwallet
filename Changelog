@@ -1,6 +1,7 @@
 Version 0.5:
 
-    * Add standard storage support (compatibility with KDE apps)
+    * HTTP Realm pasword info is stored natively, share passwords with
+    konqueror
 
 Version 0.4:
 
