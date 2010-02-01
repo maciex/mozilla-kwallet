@@ -1,3 +1,8 @@
+Version 0.6:
+
+    * Form pasword info is stored natively, share passwords with 
+    konqueror
+
 Version 0.5:
 
     * HTTP Realm pasword info is stored natively, share passwords with
