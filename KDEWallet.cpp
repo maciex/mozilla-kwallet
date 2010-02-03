@@ -382,12 +382,15 @@ NS_IMETHODIMP CountFormLogins(const nsAString & aHostname,
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() key: %s", key.toUtf8().data() ) );
 		QMap< QString, QMap< QString, QString > > entryMap;
 
-		if( wallet->hasEntry( key ) ) {
-			if( wallet->readMapList( key, entryMap ) != 0 ) 
-				return NS_ERROR_FAILURE;
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d Form Data logins", entryMap.count() ) );
-			*_retval += entryMap.count();
+		if( wallet->readMapList( key, entryMap ) != 0 ) 
+			return NS_ERROR_FAILURE;
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d Form Data logins", entryMap.count() ) );
+
+		if( entryMap.count() > 1 ) {
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Form Data can not have more than one password" ) );
+			return NS_ERROR_FAILURE;
 		}
+		*_retval += entryMap.count();
 		
 		
 		res = checkWallet();
@@ -396,14 +399,21 @@ NS_IMETHODIMP CountFormLogins(const nsAString & aHostname,
 		key += " *";
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() key: %s", key.toUtf8().data() ) );
 
-		if( wallet->hasEntry( key ) ) {
-			if( wallet->readMapList( key, entryMap ) != 0 ) 
-				return NS_ERROR_FAILURE;
-			
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d private logins", entryMap.count() ) );
-			*_retval += entryMap.count();
+		QMap< QString, QMap< QString, QString > > privateMap;
+		if( wallet->readMapList( key, privateMap ) != 0 ) 
+			return NS_ERROR_FAILURE;
+		
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d private logins", privateMap.count() ) );
+		*_retval += privateMap.count();
+
+		QMapIterator< QString, QMap< QString, QString > > iterator(privateMap);
+		while (iterator.hasNext()) {
+			iterator.next();
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() key %s", iterator.key().toUtf8().data() ) );
 		}
+
 	}
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Found %d logins", *_retval ) );
 	return NS_OK;
 }
 
@@ -838,6 +848,25 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 	return NS_OK;
 }
 
+NS_IMETHODIMP GetLoginInfoFromLoginMap( const QString & passwordName, QMap< QString, QString > & loginMap, nsCOMPtr<nsILoginInfo> & loginInfo ) {
+	loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
+	if (!loginInfo)
+		return NS_ERROR_FAILURE;
+	if( loginMap.contains( passwordName ) ) {
+		loginInfo->SetPasswordField( QtString2NSString( passwordName ) );
+		loginInfo->SetPassword( QtString2NSString( loginMap.value( passwordName ) ) );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetLoginInfoFromMapEntry() password field %s", passwordName.toUtf8().data() ) );			
+		loginMap.remove( passwordName );
+		QMap<QString, QString>::const_iterator username = loginMap.constBegin();
+		loginInfo->SetUsernameField( QtString2NSString( username.key() ) );
+		loginInfo->SetUsername( QtString2NSString( username.value() ) );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetLoginInfoFromMapEntry() login field %s", username.key().toUtf8().data() ) );			
+	}
+	NS_ADDREF(loginInfo);
+	
+	return NS_OK;
+}
+
 NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 				const nsAString & aHostname,
 				const nsAString & aActionURL,
@@ -876,41 +905,30 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() key: %s", key.toUtf8().data() ) );
 		QMap< QString, QMap< QString, QString > > entryMap;
-		if( wallet->hasEntry( key ) ) {
-			if( wallet->readMapList( key, entryMap ) != 0 ) 
-				return NS_ERROR_FAILURE;
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d Form Data logins", entryMap.count() ) );
-			
-			if( entryMap.count() > 1 ) {
-				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() there is more than one password in Form Data" ) );			
-				return NS_ERROR_FAILURE;
-			}
 
-			QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
-
-			while (iterator.hasNext()) {
-				iterator.next();
-				QMap< QString, QString > entry = iterator.value();
-				nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
-				if (!loginInfo)
-					return NS_ERROR_FAILURE;
-				if( entry.contains( passwordNames[i] ) ) {
-					loginInfo->SetPasswordField( QtString2NSString( passwordNames[i] ) );
-					loginInfo->SetPassword( QtString2NSString( entry.value( passwordNames[i] ) ) );
-					PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() password field %s", passwordNames[i].toUtf8().data() ) );			
-					entry.remove( passwordNames[i] );
-					QMap<QString, QString>::const_iterator username = entry.constBegin();
-					loginInfo->SetUsernameField( QtString2NSString( username.key() ) );
-					loginInfo->SetUsername( QtString2NSString( username.value() ) );
-					PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() login field %s", username.key().toUtf8().data() ) );			
-					loginInfo->SetHostname( aHostname );
-					loginInfo->SetFormSubmitURL( aActionURL );
-				}
-				NS_ADDREF(loginInfo);
-				array[j] = loginInfo;
-				j++;
-			}	
+		if( wallet->readMapList( key, entryMap ) != 0 ) 
+			return NS_ERROR_FAILURE;
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d Form Data logins", entryMap.count() ) );
+		
+		if( entryMap.count() > 1 ) {
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() there is more than one password in Form Data" ) );			
+			return NS_ERROR_FAILURE;
 		}
+
+		QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+
+		while (iterator.hasNext()) {
+			iterator.next();
+			nsCOMPtr<nsILoginInfo> loginInfo;
+			QMap< QString, QString > loginMap = iterator.value();
+			res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
+			NS_ENSURE_SUCCESS(res, res);
+			loginInfo->SetHostname( aHostname );
+			loginInfo->SetFormSubmitURL( aActionURL );
+
+			array[j] = loginInfo;
+			j++;
+		}	
 		
 		res = checkWallet();
 		NS_ENSURE_SUCCESS(res, res);
@@ -918,11 +936,26 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 		key += " *";
 
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() key: %s", key.toUtf8().data() ) );
-		if( wallet->hasEntry( key ) ) {
-			if( wallet->readMapList( key, entryMap ) != 0 ) 
-				return NS_ERROR_FAILURE;
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", entryMap.count() ) );
-		}
+
+		QMap< QString, QMap< QString, QString > > privateMap;
+		if( wallet->readMapList( key, privateMap ) != 0 ) 
+			return NS_ERROR_FAILURE;
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", privateMap.count() ) );
+
+		QMapIterator< QString, QMap< QString, QString > > privateIterator(privateMap);
+
+		while (privateIterator.hasNext()) {
+			privateIterator.next();
+			nsCOMPtr<nsILoginInfo> loginInfo;
+			QMap< QString, QString > loginMap = privateIterator.value();
+			res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
+			NS_ENSURE_SUCCESS(res, res);
+			loginInfo->SetHostname( aHostname );
+			loginInfo->SetFormSubmitURL( aActionURL );
+
+			array[j] = loginInfo;
+			j++;
+		}	
 	}
 	
 	if( j != *count ) {
