@@ -7,9 +7,11 @@
     <em:version>0.6</em:version>
     <em:creator>Guillermo Adrian Molina</em:creator>
     <em:contributor>Javier Llorente</em:contributor>
-    <em:description>An extension to enable passwords and form logins to be stored in KDE Wallet</em:description>
+    <em:description>This extension enable passwords and form logins to be stored in KDE Wallet</em:description>
     <em:aboutURL>chrome://firefox-kde-wallet/content/about.xul</em:aboutURL>
     <em:optionsURL>chrome://firefox-kde-wallet/content/options.xul</em:optionsURL>
+    <em:targetPlatform>Linux_x86-gcc3</em:targetPlatform>
+    <em:targetPlatform>Linux_x86_64-gcc3</em:targetPlatform>
     <em:targetApplication>
       <Description>
         <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id> <!-- Firefox -->
@@ -17,7 +19,5 @@
         <em:maxVersion>3.6.*</em:maxVersion>
       </Description>
     </em:targetApplication>
-    <em:targetPlatform>Linux_x86-gcc3</em:targetPlatform>
-    <em:targetPlatform>Linux_x86_64-gcc3</em:targetPlatform>
   </Description>
 </RDF>

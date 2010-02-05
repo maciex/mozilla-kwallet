@@ -4,7 +4,7 @@
 <prefwindow id="firefox-kde-wallet-preferences" xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" title="&prefwindow.title;">
   <prefpane id="pane1" label="&pane1.title;">
     <preferences>
-      <preference id="folder" name="extensions.firefox-kde-wallet.folder" type="string"/> <!-- note that this is only an ASCII string - use unichar for unicode strings -->
+      <preference id="folder" name="extensions.firefox-kde-wallet.folder" type="unichar"/> <!-- note that this is only an ASCII string - use unichar for unicode strings -->
     </preferences>
      <label accesskey="&folder.accesskey;" control="textfolder">&folder.label;</label><textbox id="textfolder" preference="folder"/>
   </prefpane>

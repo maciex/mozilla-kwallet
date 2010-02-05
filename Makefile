@@ -23,6 +23,7 @@ build-xpi: build-library
 #	sed -i 's/<em:targetPlatform>.*<\/em:targetPlatform>/<em:targetPlatform>Linux_$(ARCH)-gcc3<\/em:targetPlatform>/' xpi/install.rdf
 	mkdir -p xpi/platform/Linux_$(ARCH)-gcc3/components
 	cp $(TARGET) xpi/platform/Linux_$(ARCH)-gcc3/components
+	rm -f kde-wallet_password_integration-$(VERSION).xpi
 	cd xpi && find . \( ! -regex '.*/\..*' \) | zip ../$(XPI_TARGET) -@
 
 build-library: 
@@ -33,6 +34,6 @@ build-library:
 build: build-library build-xpi
  
 clean: 
-	rm $(TARGET)
-	rm xpi/platform/Linux_$(ARCH)-gcc3/components/$(TARGET)
-	rm kde-wallet_password_integration-$(VERSION).xpi
+	rm -f $(TARGET)
+	rm -f xpi/platform/Linux_$(ARCH)-gcc3/components/$(TARGET)
+	rm -f kde-wallet_password_integration-$(VERSION).xpi
