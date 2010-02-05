@@ -1,0 +1,8 @@
+<!ENTITY firefox-kde-wallet.label "Your localized menuitem">
+<!ENTITY firefox-kde-walletContext.label "Your Menuitem">
+<!ENTITY firefox-kde-walletContext.accesskey "Y">
+<!ENTITY firefox-kde-walletToolbarButton.label "Your Toolbar Button">
+<!ENTITY firefox-kde-walletToolbarButton.tooltip "This is your toolbar button!">
+<!ENTITY firefox-kde-walletSidebar.label "Your Sidebar">
+<!ENTITY firefox-kde-walletToolbar.name  "example">
+<!ENTITY firefox-kde-walletToolbar.label "This is an example toolbar. You can hide it under View &gt; toolbars &gt; &firefox-kde-walletToolbar.name;">
