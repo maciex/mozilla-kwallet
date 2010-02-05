@@ -23,7 +23,7 @@ build-xpi: build-library
 #	sed -i 's/<em:targetPlatform>.*<\/em:targetPlatform>/<em:targetPlatform>Linux_$(ARCH)-gcc3<\/em:targetPlatform>/' xpi/install.rdf
 	mkdir -p xpi/platform/Linux_$(ARCH)-gcc3/components
 	cp $(TARGET) xpi/platform/Linux_$(ARCH)-gcc3/components
-	cd xpi && zip -r ../$(XPI_TARGET) platform/Linux_*-gcc3/components/$(TARGET) install.rdf
+	cd xpi && find . \( ! -regex '.*/\..*' \) | zip ../$(XPI_TARGET) -@
 
 build-library: 
 	$(CXX) $(FILES) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS)

@@ -153,6 +153,7 @@ NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname,
                                         PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() Called") );
 
+	*_retval = 0;
 	QString key;
 
 	if( aHostname.IsVoid() || aHostname.IsEmpty() )
@@ -183,6 +184,7 @@ NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname,
 	if( wallet->readMapList( key, entryMap ) != 0 ) 
 		return NS_OK;
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() Found %d maps", entryMap.count() ) );
+
 	if( entryMap.count() == 0 ) 
 		return NS_OK;
 
@@ -696,7 +698,7 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	
 	if( wallet->readMapList( privateKey, privateMap ) != 0 ) 
 		return NS_ERROR_FAILURE;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", privateKey.count() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d private logins", privateKey.count() ) );
 
 	QMapIterator< QString, QMap< QString, QString > > privateIterator(privateMap);
 
@@ -791,7 +793,7 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 	nsresult res = CountRealmLogins( aHostname, aHttpRealm, count );
 	NS_ENSURE_SUCCESS(res, res);
 
-	if( !count )
+	if( *count == 0 )
 		return NS_OK; //There are no logins, good bye
 	
 	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( *count * sizeof(nsILoginInfo*));
