@@ -12,19 +12,21 @@ XUL_LDFLAGS = `pkg-config --libs libxul libxul-unstable`
 VERSION = 0.6
 FILES = KDEWallet.cpp 
 
+BUILD_DIR = ../build
 TARGET = libkdewallet.so
-XPI_TARGET = kde-wallet_password_integration-$(VERSION).xpi
+XPI_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).xpi
+XPI_DIR = ../xpi
 ARCH := $(shell uname -m)
 # Update the ARCH variable so that the Mozilla architectures are used
 ARCH := $(shell echo ${ARCH} | sed 's/i686/x86/')
 
 build-xpi: build-library
-	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' xpi/install.rdf
-#	sed -i 's/<em:targetPlatform>.*<\/em:targetPlatform>/<em:targetPlatform>Linux_$(ARCH)-gcc3<\/em:targetPlatform>/' xpi/install.rdf
-	mkdir -p xpi/platform/Linux_$(ARCH)-gcc3/components
-	cp $(TARGET) xpi/platform/Linux_$(ARCH)-gcc3/components
+	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' $(XPI_DIR)/install.rdf
+#	sed -i 's/<em:targetPlatform>.*<\/em:targetPlatform>/<em:targetPlatform>Linux_$(ARCH)-gcc3<\/em:targetPlatform>/' $(XPI_DIR)/install.rdf
+	mkdir -p $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components
+	cp $(TARGET) $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components
 	rm -f kde-wallet_password_integration-$(VERSION).xpi
-	cd xpi && find . \( ! -regex '.*/\..*' \) | zip ../$(XPI_TARGET) -@
+	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip $(XPI_TARGET) -@
 
 build-library: 
 	$(CXX) $(FILES) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS)
@@ -35,5 +37,5 @@ build: build-library build-xpi
  
 clean: 
 	rm -f $(TARGET)
-	rm -f xpi/platform/Linux_$(ARCH)-gcc3/components/$(TARGET)
-	rm -f kde-wallet_password_integration-$(VERSION).xpi
+	rm -f $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components/$(TARGET)
+	rm -f $(XPI_TARGET)
