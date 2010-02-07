@@ -914,49 +914,56 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 				const nsAString & aActionURL,
 				nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Called") );
-	
-	nsresult res = CountFormLogins( aHostname, aActionURL, count );
+
+	nsresult res = checkWallet( "Form Data" );
 	NS_ENSURE_SUCCESS(res, res);
 
-	if( *count == 0 )
-		return NS_OK; //There are no logins, good bye
+	QString key = NSString2QtString( aHostname );
+
+	// Firefox does not end URLs with /, we should add it
+	if( key.count( "/" ) < 3 )
+		key += "/";
+
+	key += "#*";
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() key: %s", key.toUtf8().data() ) );
+	QMap< QString, QMap< QString, QString > > entryMap;
+
+	if( wallet->readMapList( key, entryMap ) != 0 )
+		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d Form Data logins", entryMap.count() ) );
+
+	if( entryMap.count() > 1 ) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() there is more than one password in Form Data" ) );
+		return NS_ERROR_FAILURE;
+	}
+
+	res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
+	key += " *";
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() key: %s", key.toUtf8().data() ) );
+
+	QMap< QString, QMap< QString, QString > > privateMap;
+	if( wallet->readMapList( key, privateMap ) != 0 )
+		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", privateMap.count() ) );
+
+	entryMap.unite( privateMap );
 
 	QStringList formNames;
 	QStringList passwordNames;
-	
+
 	res = GetFormsAndPasswordsNames( formNames, passwordNames );
 	NS_ENSURE_SUCCESS(res, res);
-	
+
 	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( *count * sizeof(nsILoginInfo*));
 	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
 	memset(array, 0, *count * sizeof(nsILoginInfo*));
-	
+
 	PRUint32 j = 0;
 	for( int i = 0; i < formNames.size(); i++) {
-		/* First we find in folder: Form Data */
-		res = checkWallet( "Form Data" );
-		NS_ENSURE_SUCCESS(res, res);
-		
-		QString key = NSString2QtString( aHostname ); 
-		
-		// Firefox does not end URLs with /, we should add it
-		if( key.count( "/" ) < 3 )
-			key += "/";
-		
-		key += "#" + formNames[i];
-
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() key: %s", key.toUtf8().data() ) );
-		QMap< QString, QMap< QString, QString > > entryMap;
-
-		if( wallet->readMapList( key, entryMap ) != 0 ) 
-			return NS_ERROR_FAILURE;
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d Form Data logins", entryMap.count() ) );
-		
-		if( entryMap.count() > 1 ) {
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() there is more than one password in Form Data" ) );			
-			return NS_ERROR_FAILURE;
-		}
-
 		QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
 
 		while (iterator.hasNext()) {
@@ -970,41 +977,10 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 
 			array[j] = loginInfo;
 			j++;
-		}	
-		
-		res = checkWallet();
-		NS_ENSURE_SUCCESS(res, res);
-		
-		key += " *";
-
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() key: %s", key.toUtf8().data() ) );
-
-		QMap< QString, QMap< QString, QString > > privateMap;
-		if( wallet->readMapList( key, privateMap ) != 0 ) 
-			return NS_ERROR_FAILURE;
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", privateMap.count() ) );
-
-		QMapIterator< QString, QMap< QString, QString > > privateIterator(privateMap);
-
-		while (privateIterator.hasNext()) {
-			privateIterator.next();
-			nsCOMPtr<nsILoginInfo> loginInfo;
-			QMap< QString, QString > loginMap = privateIterator.value();
-			res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
-			NS_ENSURE_SUCCESS(res, res);
-			loginInfo->SetHostname( aHostname );
-			loginInfo->SetFormSubmitURL( aActionURL );
-
-			array[j] = loginInfo;
-			j++;
-		}	
+		}
 	}
-	
-	if( j != *count ) {
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Password info error" ) );
-		return NS_ERROR_FAILURE;
-	}
-	
+
+	*count = j;
 	*logins = array;
 	return NS_OK;
 }
@@ -1027,6 +1003,8 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 }
 
 NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins) {
+	/* This function is used at the Firefox->Preferences->Security Window, there is no DOM here,
+	we cannot use FindFormLogins because they deppend on DOM access, we workaround that here */
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
 
 	PRUint32 realmCount;
