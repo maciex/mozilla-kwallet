@@ -1,5 +1,0 @@
-remove # in DEBUG_FLAGS
-
-cp libkdewallet.so ~/.mozilla//firefox/2bxc339e.default/extensions/\{6f9d85e0-794d-11dd-ad8b-0800200c9a66\}/platform/Linux_x86_64-gcc3/components/libkdewallet.so
-NSPR_LOG_MODULES=KDEWalletLog:5 firefox -no-remote
-
