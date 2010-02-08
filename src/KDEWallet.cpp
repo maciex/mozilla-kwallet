@@ -55,6 +55,7 @@
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
 #include "nsIDOMDocument.h"
+#include "nsIDOMHTMLDocument.h"
 #include "nsIDOMNodeList.h"
 #include "nsIDOMElement.h"
 #include "nsIWindowMediator.h"
@@ -306,6 +307,33 @@ NS_IMETHODIMP GetFormsAndPasswordsNames( QStringList & formNames, QStringList & 
 	return NS_OK;
 }
 
+NS_IMETHODIMP GetURL( QString & qsurl ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFormNames() Called") );
+	nsCOMPtr<nsIWindowMediator> mediator = do_GetService(NS_WINDOWMEDIATOR_CONTRACTID);
+
+	nsCOMPtr<nsIDOMWindowInternal> window;
+	nsresult res = mediator->GetMostRecentWindow(nsnull, getter_AddRefs(window) );
+	NS_ENSURE_SUCCESS(res, res);
+
+	nsCOMPtr<nsIDOMWindow> content;
+	res = window->GetContent( getter_AddRefs(content) );
+	NS_ENSURE_SUCCESS(res, res);
+
+	nsCOMPtr<nsIDOMDocument> document;
+	res = content->GetDocument( getter_AddRefs(document) );
+	NS_ENSURE_SUCCESS(res, res);
+
+	nsCOMPtr<nsIDOMHTMLDocument> html_document( do_QueryInterface(document, &res ) );
+	NS_ENSURE_SUCCESS(res, res);
+
+	nsString url;
+	res = html_document->GetURL(url);
+	NS_ENSURE_SUCCESS(res, res);
+
+	qsurl = NSString2QtString( url );
+	return NS_OK;
+}  
+
 NS_IMETHODIMP GetFormNames( QStringList & formNames ) {
 	QStringList passwordNames;
 	return GetFormsAndPasswordsNames( formNames, passwordNames );
@@ -319,6 +347,11 @@ NS_IMETHODIMP CountFormLogins(const nsAString & aHostname,
 	QStringList formNames;
 	nsresult res = GetFormNames( formNames );
 	NS_ENSURE_SUCCESS(res, res);
+
+	QString url;
+	res = GetURL( url );
+	NS_ENSURE_SUCCESS(res, res);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() url: %s", url.toUtf8().data() ) );
 	
 	*_retval = 0;
 	
