@@ -126,6 +126,46 @@ NS_IMETHODIMP generateRealmWalletKey(  const nsAString & aHostname,
 	return NS_OK;
 }
 
+NS_IMETHODIMP GetURL( QString & qsurl ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetURL() Called") );
+	nsresult res;
+
+	nsCOMPtr<nsIWindowMediator> mediator = do_GetService(NS_WINDOWMEDIATOR_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
+	if( mediator == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIDOMWindowInternal> window;
+	res = mediator->GetMostRecentWindow(nsnull, getter_AddRefs(window) );
+	NS_ENSURE_SUCCESS(res, res);
+	if( window == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIDOMWindow> content;
+	res = window->GetContent( getter_AddRefs(content) );
+	NS_ENSURE_SUCCESS(res, res);
+	if( content == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIDOMDocument> document;
+	res = content->GetDocument( getter_AddRefs(document) );
+	NS_ENSURE_SUCCESS(res, res);
+	if( document == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIDOMHTMLDocument> html_document( do_QueryInterface(document, &res ) );
+	NS_ENSURE_SUCCESS(res, res);
+	if( html_document == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsString url;
+	res = html_document->GetURL(url);
+	NS_ENSURE_SUCCESS(res, res);
+
+	qsurl = NSString2QtString( url );
+	return NS_OK;
+}  
+
 NS_IMETHODIMP KDEWallet::Init() {
 	gKDEWalletLog = PR_NewLogModule("KDEWalletLog");
 
@@ -234,10 +274,12 @@ NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname,
 
 NS_IMETHODIMP GetFormsAndPasswordsNames( QStringList & formNames, QStringList & passwordNames ) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFormNames() Called") );
-	nsCOMPtr<nsIWindowMediator> mediator = do_GetService(NS_WINDOWMEDIATOR_CONTRACTID);
+	nsresult res;
+	nsCOMPtr<nsIWindowMediator> mediator = do_GetService(NS_WINDOWMEDIATOR_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
 
 	nsCOMPtr<nsIDOMWindowInternal> window;
-	nsresult res = mediator->GetMostRecentWindow(nsnull, getter_AddRefs(window) );
+	res = mediator->GetMostRecentWindow(nsnull, getter_AddRefs(window) );
 	NS_ENSURE_SUCCESS(res, res);
 
 	nsCOMPtr<nsIDOMWindow> content;
@@ -307,41 +349,12 @@ NS_IMETHODIMP GetFormsAndPasswordsNames( QStringList & formNames, QStringList & 
 	return NS_OK;
 }
 
-NS_IMETHODIMP GetURL( QString & qsurl ) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFormNames() Called") );
-	nsCOMPtr<nsIWindowMediator> mediator = do_GetService(NS_WINDOWMEDIATOR_CONTRACTID);
-
-	nsCOMPtr<nsIDOMWindowInternal> window;
-	nsresult res = mediator->GetMostRecentWindow(nsnull, getter_AddRefs(window) );
-	NS_ENSURE_SUCCESS(res, res);
-
-	nsCOMPtr<nsIDOMWindow> content;
-	res = window->GetContent( getter_AddRefs(content) );
-	NS_ENSURE_SUCCESS(res, res);
-
-	nsCOMPtr<nsIDOMDocument> document;
-	res = content->GetDocument( getter_AddRefs(document) );
-	NS_ENSURE_SUCCESS(res, res);
-
-	nsCOMPtr<nsIDOMHTMLDocument> html_document( do_QueryInterface(document, &res ) );
-	NS_ENSURE_SUCCESS(res, res);
-
-	nsString url;
-	res = html_document->GetURL(url);
-	NS_ENSURE_SUCCESS(res, res);
-
-	qsurl = NSString2QtString( url );
-	return NS_OK;
-}  
-
 NS_IMETHODIMP GetFormNames( QStringList & formNames ) {
 	QStringList passwordNames;
 	return GetFormsAndPasswordsNames( formNames, passwordNames );
 }
 
-NS_IMETHODIMP CountFormLogins(const nsAString & aHostname,
-                                        const nsAString & aActionURL,
-                                        PRUint32 *_retval) {
+NS_IMETHODIMP CountFormLogins( PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() Called") );
 
 	QStringList formNames;
@@ -360,7 +373,7 @@ NS_IMETHODIMP CountFormLogins(const nsAString & aHostname,
 		res = checkWallet( "Form Data" );
 		NS_ENSURE_SUCCESS(res, res);
 		
-		QString key = NSString2QtString( aHostname ); 
+		QString key = url; 
 		
 		// Firefox does not end URLs with /, we should add it
 		if( key.count( "/" ) < 3 )
@@ -416,7 +429,7 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
 		return CountRealmLogins( aHostname, aHttpRealm, _retval );
 	
 	if( aHttpRealm.IsVoid() )
-		return CountFormLogins( aHostname, aActionURL, _retval );
+		return CountFormLogins( _retval );
 
 	NS_ERROR("CountLogins must set aActionURL or aHttpRealm");
 	return NS_ERROR_FAILURE;
@@ -496,12 +509,7 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 	}
 	
 	PRUint32 count;
-	nsAutoString aHostname;
-	aLogin->GetHostname(aHostname);
-	nsAutoString aActionURL;
-	aLogin->GetFormSubmitURL(aActionURL);
-
-	res = CountFormLogins( aHostname,  aActionURL, &count );
+	res = CountFormLogins( &count );
 	NS_ENSURE_SUCCESS(res, res);
 
 	nsAutoString s;
@@ -515,7 +523,12 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 	aLogin->GetPassword(s);
 	entry[ passwordField ] = NSString2QtString(s);
 	
-	QString key = NSString2QtString( aHostname ); 
+	QString url;
+	res = GetURL( url );
+	NS_ENSURE_SUCCESS(res, res);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() url: %s", url.toUtf8().data() ) );
+
+	QString key = url; 
 	
 	// Firefox does not end URLs with /, we should add it
 	if( key.count( "/" ) < 3 )
@@ -645,71 +658,56 @@ NS_IMETHODIMP RemoveRealmLogin(nsILoginInfo *aLogin) {
 
 NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Called") );
-
-	QStringList formNames;
-	QStringList passwordNames;
 	
-	nsresult res = GetFormsAndPasswordsNames( formNames, passwordNames );
-	NS_ENSURE_SUCCESS(res, res);
-
-	nsAutoString aPasswordField;
-	aLogin->GetPasswordField(aPasswordField);
-	QString passwordField = NSString2QtString(aPasswordField);
-
-	QString formName;
-	// Select the form we are saving
-	for( int i = 0; i < passwordNames.size(); i++) {
-		if( passwordNames[i] == passwordField ) {
-			formName = formNames[i];
-			break;
-		}
-	}
-	
-	PRUint32 count;
 	nsAutoString aHostname;
-	aLogin->GetHostname(aHostname);
-	nsAutoString aActionURL;
-	aLogin->GetFormSubmitURL(aActionURL);
-
-	res = CountFormLogins( aHostname,  aActionURL, &count );
-	NS_ENSURE_SUCCESS(res, res);
+	aLogin->GetHostname(aHostname);	
+	QString key = NSString2QtString(aHostname) + "*#*";
 	
-	if( count == 0 ) {
-		NS_ERROR("Can not remove map information correctly");
-		return NS_ERROR_FAILURE;
-	}
-	
-	nsAutoString s;
-	QMap< QString, QString > entry;
-
 	nsAutoString aUsername;
 	aLogin->GetUsername(aUsername);
-	
-	QString key = NSString2QtString( aHostname ); 
-	
-	// Firefox does not end URLs with /, we should add it
-	if( key.count( "/" ) < 3 )
-		key += "/";
-	
-	key += "#" + formName;
-	
+	QString username =  NSString2QtString(aUsername);
 	QString privateKey = key + " " + NSString2QtString(aUsername);
 
 	// if we are lucky, password is stored in private store
-	res = checkWallet( "Form Data" );
+	nsresult res = checkWallet( "Form Data" );
 	NS_ENSURE_SUCCESS(res, res);
-		
-	if( wallet->hasEntry( privateKey ) ) { // yes!!
-		if( wallet->removeEntry( privateKey ) ) {
-			NS_ERROR("Can not remove map information correctly");
-			return NS_ERROR_FAILURE;
-		}
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Password removed from Firefox store") );
-		return NS_OK;
-	}
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() search key: %s", privateKey.toUtf8().data() ) );
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 )
+		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d Form Data logins", entryMap.count() ) );
 	
-	// password must be in Form Data, we have to remove it, and move one login info into Form Data
+	nsAutoString aUsernameField;
+	aLogin->GetUsernameField(aUsernameField);
+	QString usernameField =  NSString2QtString(aUsernameField);
+	nsAutoString aPassword;
+	aLogin->GetPassword(aPassword);
+	QString password =  NSString2QtString(aPassword);
+	nsAutoString aPasswordField;
+	aLogin->GetPasswordField(aPasswordField);
+	QString passwordField =  NSString2QtString(aPasswordField);
+
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+	while (iterator.hasNext()) {
+		iterator.next();
+		QString actualKey = iterator.key();
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() key %s", actualKey.toUtf8().data() ) );
 		
+ 		QMap< QString, QString > entry = iterator.value();
+		if( entry.contains( usernameField ) && entry.contains( passwordField ) ) {
+			if( entry[usernameField] == username && entry[passwordField] == password ) { // We've got a coincidence!!
+				if( wallet->removeEntry( actualKey ) ) {
+					NS_ERROR("Can not remove map information correctly");
+					return NS_ERROR_FAILURE;
+				}
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed key: %s", actualKey.toUtf8().data() ) );
+				return NS_OK;
+			}
+		}
+	}
+/*
+	// password must be in Form Data, we have to remove it, and move one login info into Form Data		
 	if( !wallet->hasEntry( key ) ) { 
 		NS_ERROR("Can not remove map information correctly");
 		return NS_ERROR_FAILURE;
@@ -748,7 +746,7 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 		}		
 		return NS_OK;
 	}
-		
+	*/	
 	return NS_ERROR_FAILURE;
 }
 
@@ -924,7 +922,9 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 }
 
 NS_IMETHODIMP GetLoginInfoFromLoginMap( const QString & passwordName, QMap< QString, QString > & loginMap, nsCOMPtr<nsILoginInfo> & loginInfo ) {
-	loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
+	nsresult res;
+	loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
 	if (!loginInfo)
 		return NS_ERROR_FAILURE;
 	if( loginMap.contains( passwordName ) ) {
@@ -942,16 +942,19 @@ NS_IMETHODIMP GetLoginInfoFromLoginMap( const QString & passwordName, QMap< QStr
 	return NS_OK;
 }
 
-NS_IMETHODIMP FindFormLogins(PRUint32 *count,
-				const nsAString & aHostname,
-				const nsAString & aActionURL,
-				nsILoginInfo ***logins) {
+NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Called") );
 
 	nsresult res = checkWallet( "Form Data" );
 	NS_ENSURE_SUCCESS(res, res);
 
-	QString key = NSString2QtString( aHostname );
+	QString key = url;
+	
+	int index = url.indexOf("//");
+	index = url.indexOf("/", index + 2); //Find the end of the host name
+	QString hostname = url.left( index );
+	nsAutoString aHostname = QtString2NSString( hostname );	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() hostname: %s", hostname.toUtf8().data() ) );
 
 	// Firefox does not end URLs with /, we should add it
 	if( key.count( "/" ) < 3 )
@@ -984,18 +987,18 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", privateMap.count() ) );
 
 	entryMap.unite( privateMap );
-
+	
 	QStringList formNames;
 	QStringList passwordNames;
 
 	res = GetFormsAndPasswordsNames( formNames, passwordNames );
 	NS_ENSURE_SUCCESS(res, res);
 
-	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( *count * sizeof(nsILoginInfo*));
+	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( entryMap.count() * sizeof(nsILoginInfo*));
 	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
-	memset(array, 0, *count * sizeof(nsILoginInfo*));
+	memset(array, 0, entryMap.count() * sizeof(nsILoginInfo*));
 
-	PRUint32 j = 0;
+	int j = 0;
 	for( int i = 0; i < formNames.size(); i++) {
 		QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
 
@@ -1006,13 +1009,18 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count,
 			res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
 			NS_ENSURE_SUCCESS(res, res);
 			loginInfo->SetHostname( aHostname );
-			loginInfo->SetFormSubmitURL( aActionURL );
+			loginInfo->SetFormSubmitURL( aHostname );
 
 			array[j] = loginInfo;
 			j++;
 		}
 	}
 
+	if( entryMap.count() != j ) {
+		NS_ERROR("FindFormLogins found an inconsistency in password count");
+		return NS_ERROR_FAILURE;
+	}
+		
 	*count = j;
 	*logins = array;
 	return NS_OK;
@@ -1028,18 +1036,89 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 	if( aActionURL.IsVoid() )
 		return FindRealmLogins( count, aHostname, aHttpRealm, logins );
 
-	if( aHttpRealm.IsVoid() )
-		return FindFormLogins( count, aHostname, aActionURL, logins );
+	if( aHttpRealm.IsVoid() ) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() hostname: %s", NS_ConvertUTF16toUTF8(aHostname).get() ) );
+		QString url;
+		nsresult res = GetURL( url );
+		NS_ENSURE_SUCCESS(res, res);
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() url: %s", url.toUtf8().data() ) );
+		
+		return FindFormLogins( count, url, logins );
+	}
 
 	NS_ERROR("FindLogins must set aActionURL or aHttpRealm");
 	return NS_ERROR_FAILURE;
 }
 
+NS_IMETHODIMP FindAllFormLogins(PRUint32 *count, nsILoginInfo ***logins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() Called") );
+
+	nsresult res = checkWallet( "Form Data" );
+	NS_ENSURE_SUCCESS(res, res);
+
+	QMap< QString, QMap< QString, QString > > entryMap;
+
+	if( wallet->readMapList( "*", entryMap ) != 0 )
+		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() Found %d Form Data logins", entryMap.count() ) );
+
+	res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
+	QMap< QString, QMap< QString, QString > > privateMap;
+	if( wallet->readMapList( "*", privateMap ) != 0 )
+		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() Found %d private logins", privateMap.count() ) );
+
+	entryMap.unite( privateMap );
+
+	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( entryMap.count() * sizeof(nsILoginInfo*));
+	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
+	memset(array, 0, entryMap.count() * sizeof(nsILoginInfo*));
+
+	int j = 0;
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+
+	while (iterator.hasNext()) {
+		iterator.next();
+		nsCOMPtr<nsILoginInfo> loginInfo;
+		loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID, &res);
+		NS_ENSURE_SUCCESS(res, res);
+		if (!loginInfo)
+			return NS_ERROR_FAILURE;
+
+		QString url = iterator.key();
+		int index = url.indexOf("//");
+		index = url.indexOf("/", index + 2); //Find the end of the host name
+		QString hostname = url.left( index );
+		nsAutoString aHostname = QtString2NSString( hostname );	
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() hostname: %s", hostname.toUtf8().data() ) );
+
+		loginInfo->SetHostname( aHostname );
+		loginInfo->SetFormSubmitURL( aHostname );
+		QMap< QString, QString > loginMap = iterator.value();
+		loginInfo->SetUsername( QtString2NSString( QStringList( loginMap.keys() ).join(",") ) );
+		loginInfo->SetPassword( QtString2NSString( QStringList( loginMap.values() ).join(",") ) );
+
+		NS_ADDREF(loginInfo);
+		array[j] = loginInfo;
+		j++;
+	}
+
+	if( entryMap.count() != j ) {
+		NS_ERROR("FindAllFormLogins found an inconsistency in password count");
+		return NS_ERROR_FAILURE;
+	}
+	
+	*count = j;
+	*logins = array;
+	return NS_OK;
+}
+
 NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins) {
-	/* This function is used at the Firefox->Preferences->Security Window, there is no DOM here,
-	we cannot use FindFormLogins because they deppend on DOM access, we workaround that here */
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
 
+	*aCount = 0;
 	PRUint32 realmCount;
 	nsILoginInfo **realmLogins;
 	if( FindRealmLogins( &realmCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &realmLogins  ) != NS_OK ) {
@@ -1047,19 +1126,22 @@ NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins)
 		return NS_ERROR_FAILURE;
 	}
 
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
 	PRUint32 formCount;
 	nsILoginInfo **formLogins;
 
-	nsresult res = FindFormLogins( &formCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &formLogins  );
+	nsresult res = FindAllFormLogins( &formCount, &formLogins  );
 	NS_ENSURE_SUCCESS(res, res);
 	
 	if( formCount == 0 ) {// Just Realm logins
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Realm Logins", realmCount ) );
 		*aCount = realmCount;
 		*aLogins = realmLogins;
 		return NS_OK;
 	}
 
 	if( realmCount == 0 ) { // Just Form logins
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Form Logins", formCount ) );
 		*aCount = formCount;
 		*aLogins = formLogins;
 		return NS_OK;
@@ -1074,6 +1156,8 @@ NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins)
 	nsMemory::Free( realmLogins );
 	memcpy(array + realmCount, formLogins, formCount * sizeof(nsILoginInfo*));
 	nsMemory::Free( formLogins );
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Logins", count ) );
 	
 	*aCount = count;
 	*aLogins = array;
