@@ -126,6 +126,30 @@ NS_IMETHODIMP generateRealmWalletKey(  const nsAString & aHostname,
 	return NS_OK;
 }
 
+NS_IMETHODIMP generateRealmWalletSearchKey(  const nsAString & aHostname,
+			const nsAString & aHttpRealm,
+			QString & key) {
+	if( aHostname.IsVoid() || aHostname.IsEmpty() )
+		return NS_ERROR_FAILURE;
+
+	key = NSString2QtString(aHostname);
+
+	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
+
+	if( !key.contains(":") )
+		key += ":*"; //I think this is a bug, it should be :80 or whatever
+
+	if( aHttpRealm.IsVoid() )
+		return NS_ERROR_FAILURE;
+
+	if( key.startsWith( "http" ) ) {
+		key += "-";
+		key += NSString2QtString(aHttpRealm);
+	}
+
+	return NS_OK;
+}
+
 NS_IMETHODIMP GetURL( QString & qsurl ) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetURL() Called") );
 	nsresult res;
@@ -197,28 +221,13 @@ NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname,
 	*_retval = 0;
 	QString key;
 
-	if( aHostname.IsVoid() || aHostname.IsEmpty() )
-		return NS_ERROR_FAILURE;
-
-	key = NSString2QtString(aHostname);
-
-	key.replace( "://", "-*" ); //URL may contain username, as ftp://guille@somehost.com/
-
-	if( !key.contains(":") )
-		key += ":*"; //I think this is a bug, it should be :80 or whatever
-
-	if( aHttpRealm.IsVoid() )
-		return NS_ERROR_FAILURE;
-
-	if( key.startsWith( "http" ) ) {
-		key += "-";
-		key += NSString2QtString(aHttpRealm);
-	}
+	nsresult res = generateRealmWalletSearchKey( aHostname, aHttpRealm, key );
+	NS_ENSURE_SUCCESS(res, res);
 	
 	nsAutoString temp = QtString2NSString( key );	
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
 	
-	nsresult res = checkWallet( "Passwords" );
+	res = checkWallet( "Passwords" );
 	NS_ENSURE_SUCCESS(res, res);
 		
 	QMap< QString, QMap< QString, QString > > entryMap;
@@ -663,90 +672,119 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	aLogin->GetHostname(aHostname);	
 	QString key = NSString2QtString(aHostname) + "*#*";
 	
-	nsAutoString aUsername;
-	aLogin->GetUsername(aUsername);
-	QString username =  NSString2QtString(aUsername);
-	QString privateKey = key + " " + NSString2QtString(aUsername);
+	QString privateKey = key + " *";
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Trying to remove from private store" ) );
 
 	// if we are lucky, password is stored in private store
-	nsresult res = checkWallet( "Form Data" );
+	nsresult res = checkWallet();
 	NS_ENSURE_SUCCESS(res, res);
 
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() search key: %s", privateKey.toUtf8().data() ) );
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 )
 		return NS_ERROR_FAILURE;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d Form Data logins", entryMap.count() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d Private logins", entryMap.count() ) );
 	
-	nsAutoString aUsernameField;
-	aLogin->GetUsernameField(aUsernameField);
-	QString usernameField =  NSString2QtString(aUsernameField);
-	nsAutoString aPassword;
-	aLogin->GetPassword(aPassword);
-	QString password =  NSString2QtString(aPassword);
-	nsAutoString aPasswordField;
-	aLogin->GetPasswordField(aPasswordField);
-	QString passwordField =  NSString2QtString(aPasswordField);
-
+	nsAutoString aFieldInfo;
+	aLogin->GetUsername(aFieldInfo);
+	QString fieldInfo =  NSString2QtString(aFieldInfo);
+	QStringList field = fieldInfo.split( "," );
+	nsAutoString aDataInfo;
+	aLogin->GetPassword(aDataInfo);
+	QString dataInfo =  NSString2QtString(aDataInfo);
+	QStringList data = dataInfo.split( "," );
+	
 	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
 	while (iterator.hasNext()) {
 		iterator.next();
 		QString actualKey = iterator.key();
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() key %s", actualKey.toUtf8().data() ) );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() private key %s", actualKey.toUtf8().data() ) );
 		
  		QMap< QString, QString > entry = iterator.value();
-		if( entry.contains( usernameField ) && entry.contains( passwordField ) ) {
-			if( entry[usernameField] == username && entry[passwordField] == password ) { // We've got a coincidence!!
+		if( entry.contains( field[0] ) && entry.contains( field[1] ) ) {
+			if( entry[ field[0] ] == data[0] && entry[ field[1] ] == data[1] ) { // We've got a coincidence!!
 				if( wallet->removeEntry( actualKey ) ) {
 					NS_ERROR("Can not remove map information correctly");
 					return NS_ERROR_FAILURE;
 				}
-				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed key: %s", actualKey.toUtf8().data() ) );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed private key: %s", actualKey.toUtf8().data() ) );
 				return NS_OK;
 			}
 		}
 	}
-/*
-	// password must be in Form Data, we have to remove it, and move one login info into Form Data		
-	if( !wallet->hasEntry( key ) ) { 
-		NS_ERROR("Can not remove map information correctly");
-		return NS_ERROR_FAILURE;
-	}
 
-	if( wallet->removeEntry( key ) ) {
-		NS_ERROR("Can not remove map information correctly");
-		return NS_ERROR_FAILURE;
-	}
-	
-	if( count == 1 ) // we already removed it
-		return NS_OK;
-	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Trying to remove from Form Data store" ) );
+
+	// password must be in Form Data, we have to remove it, and move one login info into Form Data
 	res = checkWallet( "Form Data" );
 	NS_ENSURE_SUCCESS(res, res);
 
-	QMap< QString, QMap< QString, QString > > privateMap;
-	privateKey = key + " *";
-	
-	if( wallet->readMapList( privateKey, privateMap ) != 0 ) 
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Form Data search key: %s", key.toUtf8().data() ) );
+	QMap< QString, QMap< QString, QString > > entryFDMap;
+	if( wallet->readMapList( key, entryFDMap ) != 0 )
 		return NS_ERROR_FAILURE;
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d private logins", privateKey.count() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d Form Data logins", entryFDMap.count() ) );
+
+	QString actualKey;
+	QMapIterator< QString, QMap< QString, QString > > iterator2(entryFDMap);
+	while (iterator2.hasNext()) {
+		iterator2.next();
+		actualKey = iterator2.key();
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Form Data key %s", actualKey.toUtf8().data() ) );
+
+ 		QMap< QString, QString > entry = iterator2.value();
+		if( entry.contains( field[0] ) && entry.contains( field[1] ) ) {
+			if( entry[ field[0] ] == data[0] && entry[ field[1] ] == data[1] ) { // We've got a coincidence!!
+				if( wallet->removeEntry( actualKey ) ) {
+					NS_ERROR("Can not remove map information correctly");
+					return NS_ERROR_FAILURE;
+				}
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed Form Data key: %s", actualKey.toUtf8().data() ) );
+				break;
+			}
+		}
+	}
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed from Form Data store, try to move an entry from private store" ) );
+
+	QString searchKey = actualKey + " *";
+	res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() search private key: %s", searchKey.toUtf8().data() ) );
+	QMap< QString, QMap< QString, QString > > privateMap;
+	if( wallet->readMapList( searchKey, privateMap ) != 0 )
+		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Found %d Private logins", privateMap.count() ) );
+
+	if( privateMap.count() == 0 ) // we have nothing to move
+		return NS_OK;
 
 	QMapIterator< QString, QMap< QString, QString > > privateIterator(privateMap);
 
 	while (privateIterator.hasNext()) {
 		privateIterator.next();
 		QMap< QString, QString > loginMap = privateIterator.value();
-		
-		res = checkWallet();
+
+		if( wallet->removeEntry( privateIterator.key() ) ) {
+			NS_ERROR("Can not remove map information correctly");
+			return NS_ERROR_FAILURE;
+		}
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed private key: %s", privateIterator.key().toUtf8().data() ) );
+
+		res = checkWallet( "Form Data" );
 		NS_ENSURE_SUCCESS(res, res);
-		
-		if( wallet->writeMap( key, loginMap ) ) {
+
+		if( wallet->writeMap( actualKey, loginMap ) ) {
 			NS_ERROR("Can not save map information");
 			return NS_ERROR_FAILURE;
 		}		
+
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Added Form Data key %s", actualKey.toUtf8().data() ) );
 		return NS_OK;
 	}
-	*/	
+
 	return NS_ERROR_FAILURE;
 }
 
@@ -826,14 +864,14 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 
 	if( *count == 0 )
 		return NS_OK; //There are no logins, good bye
-	
+
 	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( *count * sizeof(nsILoginInfo*));
 	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
 	memset(array, 0, *count * sizeof(nsILoginInfo*));
 
 	QString key;
 
-	res = generateRealmWalletKey( aHostname, aHttpRealm, key );
+	res = generateRealmWalletSearchKey( aHostname, aHttpRealm, key );
 	NS_ENSURE_SUCCESS(res, res);
 	
 	nsAutoString temp = QtString2NSString( key );	
@@ -1004,15 +1042,19 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo *
 
 		while (iterator.hasNext()) {
 			iterator.next();
-			nsCOMPtr<nsILoginInfo> loginInfo;
-			QMap< QString, QString > loginMap = iterator.value();
-			res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
-			NS_ENSURE_SUCCESS(res, res);
-			loginInfo->SetHostname( aHostname );
-			loginInfo->SetFormSubmitURL( aHostname );
+			QString fullUrl = url + "#" + formNames[i];
+			if( iterator.key().left( fullUrl.size() ) == fullUrl ) {
+				nsCOMPtr<nsILoginInfo> loginInfo;
+				QMap< QString, QString > loginMap = iterator.value();
+				res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
+				NS_ENSURE_SUCCESS(res, res);
+				loginInfo->SetHostname( aHostname );
+				loginInfo->SetFormSubmitURL( aHostname );
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Adding info for %s", fullUrl.toUtf8().data() ) );
 
-			array[j] = loginInfo;
-			j++;
+				array[j] = loginInfo;
+				j++;
+			}
 		}
 	}
 
@@ -1066,7 +1108,7 @@ NS_IMETHODIMP FindAllFormLogins(PRUint32 *count, nsILoginInfo ***logins) {
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QMap< QString, QString > > privateMap;
-	if( wallet->readMapList( "*", privateMap ) != 0 )
+	if( wallet->readMapList( "* *", privateMap ) != 0 )
 		return NS_ERROR_FAILURE;
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() Found %d private logins", privateMap.count() ) );
 
