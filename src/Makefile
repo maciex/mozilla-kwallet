@@ -15,6 +15,7 @@ FILES = KDEWallet.cpp
 BUILD_DIR = ../build
 TARGET = libkdewallet.so
 XPI_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).xpi
+TARBAL_TARGET = build/kde-wallet_password_integration-$(VERSION).tar.gz
 XPI_DIR = ../xpi
 ARCH := $(shell uname -m)
 # Update the ARCH variable so that the Mozilla architectures are used
@@ -25,7 +26,7 @@ build-xpi: build-library
 #	sed -i 's/<em:targetPlatform>.*<\/em:targetPlatform>/<em:targetPlatform>Linux_$(ARCH)-gcc3<\/em:targetPlatform>/' $(XPI_DIR)/install.rdf
 	mkdir -p $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components
 	cp $(TARGET) $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components
-	rm -f kde-wallet_password_integration-$(VERSION).xpi
+	rm -f $(XPI_TARGET)
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip $(XPI_TARGET) -@
 
 build-library: 
@@ -39,3 +40,8 @@ clean:
 	rm -f $(TARGET)
 	rm -f $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components/$(TARGET)
 	rm -f $(XPI_TARGET)
+	rm -f $(TARBAL_TARGET)
+
+tarbal:
+	rm -f $(TARBAL_TARGET)
+	cd .. && tar cvf $(TARBAL_TARGET) --exclude '.*'  --exclude '*.so' --exclude 'build' *

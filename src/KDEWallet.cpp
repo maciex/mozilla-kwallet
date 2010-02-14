@@ -1025,6 +1025,8 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo *
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d private logins", privateMap.count() ) );
 
 	entryMap.unite( privateMap );
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Found %d logins", entryMap.count() ) );
 	
 	QStringList formNames;
 	QStringList passwordNames;
@@ -1043,7 +1045,8 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo *
 		while (iterator.hasNext()) {
 			iterator.next();
 			QString fullUrl = url + "#" + formNames[i];
-			if( iterator.key().left( fullUrl.size() ) == fullUrl ) {
+			QString thisKey = iterator.key().section( ' ', 0);
+			if( thisKey == fullUrl ) {
 				nsCOMPtr<nsILoginInfo> loginInfo;
 				QMap< QString, QString > loginMap = iterator.value();
 				res = GetLoginInfoFromLoginMap( passwordNames[i], loginMap, loginInfo );
@@ -1059,6 +1062,7 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo *
 	}
 
 	if( entryMap.count() != j ) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() %d %d", entryMap.count(), j ) );
 		NS_ERROR("FindFormLogins found an inconsistency in password count");
 		return NS_ERROR_FAILURE;
 	}
