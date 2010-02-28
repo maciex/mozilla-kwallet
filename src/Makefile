@@ -1,5 +1,5 @@
 CXX   = g++
-#DEBUG_FLAGS = -DDEBUG
+DEBUG_FLAGS = -DDEBUG
 CPPFLAGS +=     -fno-rtti              \
 		-fno-exceptions        \
 		-shared                \
