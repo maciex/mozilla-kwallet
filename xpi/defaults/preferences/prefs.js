@@ -1,3 +1,4 @@
+pref("extensions.firefox-kde-wallet.wallet", "LocalWallet");
 pref("extensions.firefox-kde-wallet.folder", "Firefox");
 
 // https://developer.mozilla.org/en/Localizing_extension_descriptions

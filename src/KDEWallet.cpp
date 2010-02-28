@@ -86,19 +86,98 @@ const char *kPasswordAttr = "password";
 /* Implementation file */
 NS_IMPL_ISUPPORTS1(KDEWallet, nsILoginManagerStorage)
 
-NS_IMETHODIMP checkWallet( const char *folder = "Firefox" ) {
+NS_IMETHODIMP GetWalletPreference( QString &walletPref ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetWalletPreference() Called") );
+	nsresult res;
+
+	nsCOMPtr<nsIPrefService> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
+	if( prefs == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIPrefBranch> branch;
+	res = prefs->GetBranch("extensions.firefox-kde-wallet.", getter_AddRefs(branch));
+	NS_ENSURE_SUCCESS(res, res);
+	if( branch == nsnull )
+		return NS_ERROR_FAILURE;
+
+	char* value = NULL;
+	branch->GetCharPref( "wallet", &value);
+	if (value == NULL)
+		return NS_ERROR_FAILURE;
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetWalletPreference() Wallet=%s", value) );
+	walletPref = QString( value );
+	return NS_OK;
+}
+
+NS_IMETHODIMP GetFolderPreference( QString &folderPref ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFolderPreference() Called") );
+	nsresult res;
+
+	nsCOMPtr<nsIPrefService> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
+	if( prefs == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIPrefBranch> branch;
+	res = prefs->GetBranch("extensions.firefox-kde-wallet.", getter_AddRefs(branch));
+	NS_ENSURE_SUCCESS(res, res);
+	if( branch == nsnull )
+		return NS_ERROR_FAILURE;
+
+	char* value = NULL;
+	branch->GetCharPref( "folder", &value);
+	if (value == NULL)
+		return NS_ERROR_FAILURE;
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFolderPreference() Folder=%s", value) );
+	folderPref = QString( value );
+	return NS_OK;
+}
+
+NS_IMETHODIMP checkWallet( void ) {
+	QString walletPref;
+	nsresult res = GetWalletPreference( walletPref );	
+	NS_ENSURE_SUCCESS(res, res);
+		
 	if( !wallet ) {
-		wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous );
+		if( walletPref == "LocalWallet" )
+			wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous );
+		if( walletPref == "NetworkWallet" )
+			wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::NetworkWallet(), 0, KWallet::Wallet::Synchronous );
 		if( !wallet )
 			return NS_ERROR_FAILURE;
 	}
-	if( !wallet->hasFolder(folder) ) {
-		if( !wallet->createFolder(folder) ) 
+	return NS_OK;
+}
+
+NS_IMETHODIMP selectFolder( const QString &folder ) {
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
+	if( !wallet->hasFolder( folder ) ) {
+		if( !wallet->createFolder( folder ) )
 			return NS_ERROR_FAILURE;
 	}
-	if( !wallet->setFolder(folder) )
+	if( !wallet->setFolder( folder ) )
 		return NS_ERROR_FAILURE;
 	return NS_OK;
+}
+
+NS_IMETHODIMP selectPasswordFolder( void ) {
+	return selectFolder( KWallet::Wallet::PasswordFolder() );
+}
+
+NS_IMETHODIMP selectFormDataFolder( void ) {
+	return selectFolder( KWallet::Wallet::FormDataFolder() );
+}
+
+NS_IMETHODIMP selectDefaultFolder( void ) {
+	QString folderPref;
+	nsresult res = GetFolderPreference( folderPref );
+	NS_ENSURE_SUCCESS(res, res);
+	return selectFolder( folderPref );
 }
 
 nsAutoString QtString2NSString ( const QString &qtString ) {
@@ -162,7 +241,7 @@ QString generateBulkWalletKey( const nsAString & aHostname,
 			const nsAString & aActionURL,
 			const nsAString & aHttpRealm,
 			const nsAString & aUsername ) {
-	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "" : NSString2QtString(aUsername);
+	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "" : NSString2QtString(aUsername).replace(' ', "%20");
 	key += ",";
 	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "" : NSString2QtString(aActionURL);
 	key += ",";
@@ -176,7 +255,7 @@ QString generateBulkWalletSearchKey( const nsAString & aHostname,
 			const nsAString & aActionURL,
 			const nsAString & aHttpRealm,
 			const nsAString & aUsername ) {
-	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "*" : NSString2QtString(aUsername);
+	QString key = (aUsername.IsVoid() || aUsername.IsEmpty() ) ? "*" : NSString2QtString(aUsername).replace(' ', "%20");
 	key += ",";
 	key += (aActionURL.IsVoid() || aActionURL.IsEmpty() ) ? "*" : NSString2QtString(aActionURL);
 	key += ",";
@@ -316,12 +395,8 @@ NS_IMETHODIMP KDEWallet::Init() {
 	KAboutData aboutData("Firefox", NULL, ki18n("Firefox KWallet Plugin"), "" );
 	KCmdLineArgs::init( &aboutData );
 	app = new KApplication(false);
-  
-	if( checkWallet() )
-	  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::Init() Wallet opened") );
-	else
-	  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::Init() Wallet not opened") );
-	return NS_OK;
+
+	return checkWallet();
 }
 
 NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
@@ -346,7 +421,7 @@ NS_IMETHODIMP RemoveRealmLogin(nsILoginInfo *aLogin) {
 	nsAutoString temp = QtString2NSString( key );
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveRealmLogin() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
 
-	res = checkWallet( "Passwords" );
+	res = selectPasswordFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QMap< QString, QString > > entryMap;
@@ -408,9 +483,19 @@ NS_IMETHODIMP RemoveRealmLogin(nsILoginInfo *aLogin) {
 	return NS_OK;
 }
 
+NS_IMETHODIMP RemoveBulkLogin(nsILoginInfo *);
+
 NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Called") );
-
+	//First check if it is in the bulk store:
+	nsresult res = RemoveBulkLogin(aLogin);
+	if( res == NS_OK ) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed bulk key" ) );
+		return res;
+	}
+	
+	NS_ENSURE_SUCCESS(res, res);
+	
 	nsAutoString aHostname;
 	aLogin->GetHostname(aHostname);
 	QString key = NSString2QtString(aHostname) + "*#*";
@@ -420,7 +505,7 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Trying to remove from private store" ) );
 
 	// if we are lucky, password is stored in private store
-	nsresult res = checkWallet();
+	res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() search key: %s", privateKey.toUtf8().data() ) );
@@ -460,7 +545,7 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Trying to remove from Form Data store" ) );
 
 	// password must be in Form Data, we have to remove it, and move one login info into Form Data
-	res = checkWallet( "Form Data" );
+	res = selectFormDataFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Form Data search key: %s", key.toUtf8().data() ) );
@@ -492,7 +577,7 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed from Form Data store, try to move an entry from private store" ) );
 
 	QString searchKey = actualKey + " *";
-	res = checkWallet();
+	res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() search private key: %s", searchKey.toUtf8().data() ) );
@@ -516,7 +601,7 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 		}
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Removed private key: %s", privateIterator.key().toUtf8().data() ) );
 
-		res = checkWallet( "Form Data" );
+		res = selectFormDataFolder();
 		NS_ENSURE_SUCCESS(res, res);
 
 		if( wallet->writeMap( actualKey, loginMap ) ) {
@@ -532,9 +617,9 @@ NS_IMETHODIMP RemoveFormLogin(nsILoginInfo *aLogin) {
 }
 
 NS_IMETHODIMP RemoveBulkLogin(nsILoginInfo *aLogin) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveFormLogin() Called") );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveBulkLogin() Called") );
 
-	nsresult res = checkWallet();
+	nsresult res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	nsAutoString aUsername;
@@ -547,11 +632,16 @@ NS_IMETHODIMP RemoveBulkLogin(nsILoginInfo *aLogin) {
 	aLogin->GetHostname(aHostname);
 
 	QString key = generateBulkWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
-	if( wallet->removeEntry( key ) ) {
-		NS_ERROR("Can not remove correctly map information");
-		return NS_ERROR_FAILURE;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveBulkLogin() bulk key %s", key.toUtf8().data() ) );
+	if( wallet->hasEntry( key ) ) {
+		if( wallet->removeEntry( key ) ) {
+			NS_ERROR("Can not remove correctly map information");
+			return NS_ERROR_FAILURE;
+		}
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveBulkLogin() removed bulk key %s", key.toUtf8().data() ) );
+		return NS_OK;
 	}
-	return NS_OK;
+	return NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
@@ -627,7 +717,7 @@ NS_IMETHODIMP FindRealmLogins(PRUint32 *count,
 			}
 		}
 
-		res = checkWallet( "Passwords" );
+		res = selectPasswordFolder();
 		NS_ENSURE_SUCCESS(res, res);
 
  		QMap< QString, QString > entry = iterator.value();
@@ -703,7 +793,7 @@ NS_IMETHODIMP GetLoginInfoFromLoginMap( const QString & passwordName, QMap< QStr
 NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindFormLogins() Called") );
 
-	nsresult res = checkWallet( "Form Data" );
+	nsresult res = selectFormDataFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QString key = url;
@@ -732,7 +822,7 @@ NS_IMETHODIMP FindFormLogins(PRUint32 *count, const QString &url, nsILoginInfo *
 		return NS_ERROR_FAILURE;
 	}
 
-	res = checkWallet();
+	res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	key += " *";
@@ -800,7 +890,7 @@ NS_IMETHODIMP FindBulkLogins(PRUint32 *count,
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindBulkLogins() Called") );
 	*count = 0;
 
-	nsresult res = checkWallet();
+	nsresult res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QString key = generateBulkWalletSearchKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
@@ -875,7 +965,7 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 NS_IMETHODIMP FindAllFormLogins(PRUint32 *count, nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() Called") );
 
-	nsresult res = checkWallet( "Form Data" );
+	nsresult res = selectFormDataFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QMap< QString, QString > > entryMap;
@@ -884,7 +974,7 @@ NS_IMETHODIMP FindAllFormLogins(PRUint32 *count, nsILoginInfo ***logins) {
 		return NS_ERROR_FAILURE;
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindAllFormLogins() Found %d Form Data logins", entryMap.count() ) );
 
-	res = checkWallet();
+	res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QMap< QString, QString > > privateMap;
@@ -951,7 +1041,7 @@ NS_IMETHODIMP CountRealmLogins(const nsAString & aHostname,
 	nsAutoString temp = QtString2NSString( key );	
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountRealmLogins() search key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
 	
-	res = checkWallet( "Passwords" );
+	res = selectPasswordFolder();
 	NS_ENSURE_SUCCESS(res, res);
 		
 	QMap< QString, QMap< QString, QString > > entryMap;
@@ -1022,7 +1112,7 @@ NS_IMETHODIMP CountFormLogins( PRUint32 *_retval) {
 	
 	for( int i = 0; i < formNames.size(); i++) {
 		/* First we find in folder: Form Data */
-		res = checkWallet( "Form Data" );
+		res = selectFormDataFolder();
 		NS_ENSURE_SUCCESS(res, res);
 		
 		QString key = url; 
@@ -1047,7 +1137,7 @@ NS_IMETHODIMP CountFormLogins( PRUint32 *_retval) {
 		*_retval += entryMap.count();
 		
 		
-		res = checkWallet();
+		res = selectDefaultFolder();
 		NS_ENSURE_SUCCESS(res, res);
 		
 		key += " *";
@@ -1127,7 +1217,7 @@ NS_IMETHODIMP AddRealmLogin(nsILoginInfo *aLogin) {
 	nsAutoString temp = QtString2NSString( key );
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddRealmLogin() key: %s", NS_ConvertUTF16toUTF8(temp).get() ) );
 	
-	res = checkWallet( "Passwords" );
+	res = selectPasswordFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QString > entry;
@@ -1196,7 +1286,7 @@ NS_IMETHODIMP AddBulkLogin(nsILoginInfo *aLogin) {
 	aLogin->GetHostname(aHostname);
 	entry[ kHostnameAttr ] = NSString2QtString(aHostname);
 
-	nsresult res = checkWallet();
+	nsresult res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QString key = generateBulkWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
@@ -1264,7 +1354,7 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 		// Add password to Firefox folder
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() Add password to Firefox folder") );
 
-		res = checkWallet();
+		res = selectDefaultFolder();
 		NS_ENSURE_SUCCESS(res, res);
 
 		key += " " + NSString2QtString(aUsername);
@@ -1273,7 +1363,7 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 		// Add password to Form Data folder
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() Add password to Form Data folder") );
 
-		res = checkWallet( "Form Data" );
+		res = selectFormDataFolder();
 		NS_ENSURE_SUCCESS(res, res);
 	}
 	
@@ -1343,10 +1433,13 @@ NS_IMETHODIMP KDEWallet::RemoveAllLogins() {
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() removed folder Passwords") );
 	}
 
-	if( wallet->hasFolder( "Firefox" ) ) {
-		if( !wallet->removeFolder( "Firefox" ) )
+	QString folderPref;
+	nsresult res = GetFolderPreference( folderPref );
+	NS_ENSURE_SUCCESS(res, res);
+	if( wallet->hasFolder( folderPref ) ) {
+		if( !wallet->removeFolder( folderPref ) )
 			return NS_ERROR_FAILURE;
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() removed folder Firefox") );
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() removed folder %s", folderPref.toUtf8().data() ) );
 	}
 
 	return NS_OK;
@@ -1356,48 +1449,62 @@ NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins)
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
 
 	*aCount = 0;
+
 	PRUint32 realmCount;
 	nsILoginInfo **realmLogins;
-	if( FindRealmLogins( &realmCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &realmLogins  ) != NS_OK ) {
-		NS_ERROR("Get Realm Logins failed");
-		return NS_ERROR_FAILURE;
-	}
-
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
-	PRUint32 formCount;
-	nsILoginInfo **formLogins;
-
-	nsresult res = FindAllFormLogins( &formCount, &formLogins  );
+	nsresult res = FindRealmLogins( &realmCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &realmLogins  );
 	NS_ENSURE_SUCCESS(res, res);
-	
-	if( formCount == 0 ) {// Just Realm logins
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Realm Logins", realmCount ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Realm Logins", realmCount ) );
+	if( realmCount > 0 ) {
 		*aCount = realmCount;
 		*aLogins = realmLogins;
-		return NS_OK;
+	}
+	
+	PRUint32 formCount;
+	nsILoginInfo **formLogins;
+	res = FindAllFormLogins( &formCount, &formLogins  );
+	NS_ENSURE_SUCCESS(res, res);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Form Logins", formCount ) );
+	if( formCount > 0 ) {
+		if( *aCount == 0 ) {
+			*aCount = formCount;
+			*aLogins = formLogins;
+		} else {
+			PRUint32 count = *aCount + formCount;
+			nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( count * sizeof(nsILoginInfo*));
+			NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
+			memcpy( array, *aLogins, *aCount * sizeof(nsILoginInfo*));
+			nsMemory::Free( *aLogins );
+			memcpy(array + *aCount, formLogins, formCount * sizeof(nsILoginInfo*));
+			nsMemory::Free( formLogins );
+			*aCount = count;
+			*aLogins = array;
+		}
+	}
+		
+	PRUint32 bulkCount;
+	nsILoginInfo **bulkLogins;
+	res = FindBulkLogins( &bulkCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), &bulkLogins  );
+	NS_ENSURE_SUCCESS(res, res);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Bulk Logins", bulkCount ) );
+	if( bulkCount > 0 ) {
+		if( *aCount == 0 ) {
+			*aCount = bulkCount;
+			*aLogins = bulkLogins;
+		} else {
+			PRUint32 count = *aCount + bulkCount;
+			nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( count * sizeof(nsILoginInfo*));
+			NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
+			memcpy( array, *aLogins, *aCount * sizeof(nsILoginInfo*));
+			nsMemory::Free( *aLogins );
+			memcpy(array + *aCount, bulkLogins, bulkCount * sizeof(nsILoginInfo*));
+			nsMemory::Free( bulkLogins );
+			*aCount = count;
+			*aLogins = array;
+		}
 	}
 
-	if( realmCount == 0 ) { // Just Form logins
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Form Logins", formCount ) );
-		*aCount = formCount;
-		*aLogins = formLogins;
-		return NS_OK;
-	}
-
-	//Both Realm and form logins, have to join them
-	
-	PRUint32 count = realmCount + formCount;
-	nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc( count * sizeof(nsILoginInfo*));
-	NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
-	memcpy(array, realmLogins, realmCount * sizeof(nsILoginInfo*));
-	nsMemory::Free( realmLogins );
-	memcpy(array + realmCount, formLogins, formCount * sizeof(nsILoginInfo*));
-	nsMemory::Free( formLogins );
-
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Logins", count ) );
-	
-	*aCount = count;
-	*aLogins = array;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Found %d Logins", *aCount ) );
 	return NS_OK;
 }
 
@@ -1420,7 +1527,7 @@ NS_IMETHODIMP KDEWallet::GetAllDisabledHosts(PRUint32 *aCount,
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllDisabledHosts() Called") );
 	*aCount = 0;
 
-	nsresult res = checkWallet();
+	nsresult res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QString > saveDisabledHostMap;
@@ -1455,7 +1562,7 @@ NS_IMETHODIMP KDEWallet::GetLoginSavingEnabled(const nsAString & aHost,
                                                   PRBool *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetLoginSavingEnabled() Called") );
   
-	nsresult res = checkWallet();
+	nsresult res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QString > saveDisabledHostMap;
@@ -1478,7 +1585,7 @@ NS_IMETHODIMP KDEWallet::SetLoginSavingEnabled(const nsAString & aHost,
                                                   PRBool isEnabled) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SetLoginSavingEnabled() Called") );
   
-	nsresult res = checkWallet();
+	nsresult res = selectDefaultFolder();
 	NS_ENSURE_SUCCESS(res, res);
 
 	QMap< QString, QString > saveDisabledHostMap;

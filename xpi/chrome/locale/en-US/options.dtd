@@ -1,4 +1,9 @@
 <!ENTITY prefwindow.title "Firefox-KWallet preferences">
 <!ENTITY pane1.title "Firefox-KWallet preferences">
-<!ENTITY folder.label "Folder name in KWallet">
+<!ENTITY wallet.label "Select wallet">
+<!ENTITY localwallet.label "Local Wallet">
+<!ENTITY localwallet.accesskey "L">
+<!ENTITY networkwallet.label "Network Wallet">
+<!ENTITY networkwallet.accesskey "N">
+<!ENTITY folder.label "Select folder name">
 <!ENTITY folder.accesskey "F">
