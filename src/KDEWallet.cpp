@@ -86,8 +86,17 @@ const char *kPasswordAttr = "password";
 /* Implementation file */
 NS_IMPL_ISUPPORTS1(KDEWallet, nsILoginManagerStorage)
 
-NS_IMETHODIMP GetWalletPreference( QString &walletPref ) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetWalletPreference() Called") );
+nsAutoString QtString2NSString ( const QString &qtString ) {
+	return NS_ConvertUTF8toUTF16( qtString.toUtf8().data() );
+}
+
+QString NSString2QtString ( const nsAString & nsas ) {
+	nsAutoString nsautos(nsas);
+	return QString::fromUtf16(nsautos.get());
+}
+
+NS_IMETHODIMP GetPreference( const char *which, QString &preference ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetPreference() Called") );
 	nsresult res;
 
 	nsCOMPtr<nsIPrefService> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID, &res);
@@ -102,38 +111,21 @@ NS_IMETHODIMP GetWalletPreference( QString &walletPref ) {
 		return NS_ERROR_FAILURE;
 
 	char* value = NULL;
-	branch->GetCharPref( "wallet", &value);
+	branch->GetCharPref( which, &value);
 	if (value == NULL)
 		return NS_ERROR_FAILURE;
 
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetWalletPreference() Wallet=%s", value) );
-	walletPref = QString( value );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetPreference() %s=%s", which, value) );
+	preference = QString( value );
 	return NS_OK;
 }
 
-NS_IMETHODIMP GetFolderPreference( QString &folderPref ) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFolderPreference() Called") );
-	nsresult res;
+NS_IMETHODIMP GetFolderPreference( QString &preference ) {
+	return GetPreference( "folder", preference );
+}
 
-	nsCOMPtr<nsIPrefService> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID, &res);
-	NS_ENSURE_SUCCESS(res, res);
-	if( prefs == nsnull )
-		return NS_ERROR_FAILURE;
-
-	nsCOMPtr<nsIPrefBranch> branch;
-	res = prefs->GetBranch("extensions.firefox-kde-wallet.", getter_AddRefs(branch));
-	NS_ENSURE_SUCCESS(res, res);
-	if( branch == nsnull )
-		return NS_ERROR_FAILURE;
-
-	char* value = NULL;
-	branch->GetCharPref( "folder", &value);
-	if (value == NULL)
-		return NS_ERROR_FAILURE;
-
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetFolderPreference() Folder=%s", value) );
-	folderPref = QString( value );
-	return NS_OK;
+NS_IMETHODIMP GetWalletPreference( QString &preference ) {
+	return GetPreference( "wallet", preference );
 }
 
 NS_IMETHODIMP checkWallet( void ) {
@@ -178,15 +170,6 @@ NS_IMETHODIMP selectDefaultFolder( void ) {
 	nsresult res = GetFolderPreference( folderPref );
 	NS_ENSURE_SUCCESS(res, res);
 	return selectFolder( folderPref );
-}
-
-nsAutoString QtString2NSString ( const QString &qtString ) {
-	return NS_ConvertUTF8toUTF16( qtString.toUtf8().data() );
-}
-
-QString NSString2QtString ( const nsAString & nsas ) {
-	nsAutoString nsautos(nsas);
-	return QString::fromUtf16(nsautos.get());
 }
 
 NS_IMETHODIMP generateRealmWalletKey(  const nsAString & aHostname,
@@ -894,6 +877,7 @@ NS_IMETHODIMP FindBulkLogins(PRUint32 *count,
 	NS_ENSURE_SUCCESS(res, res);
 
 	QString key = generateBulkWalletSearchKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindBulkLogins() key: %s", key.toUtf8().data() ) );
 
 	QMap< QString, QMap< QString, QString > > entryMap;
 	if( wallet->readMapList( key, entryMap ) != 0 )
@@ -937,12 +921,16 @@ NS_IMETHODIMP FindBulkLogins(PRUint32 *count,
 	return NS_OK;
 }
 
+NS_IMETHODIMP TryToEnableBulkLogin(const nsAString &, const nsAString &, const nsAString &);
+
 NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
                                        const nsAString & aHostname,
                                        const nsAString & aActionURL,
                                        const nsAString & aHttpRealm,
                                        nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Called") );
+
+	TryToEnableBulkLogin( aHostname, aActionURL, aHttpRealm );
 
 	if( aActionURL.IsVoid() )
 		return FindRealmLogins( count, aHostname, aHttpRealm, logins );
@@ -1162,22 +1150,29 @@ NS_IMETHODIMP CountFormLogins( PRUint32 *_retval) {
 }
 
 NS_IMETHODIMP AddFormLogin(nsILoginInfo *);
+NS_IMETHODIMP AddRealmLogin(nsILoginInfo *);
 
 NS_IMETHODIMP TryToEnableBulkLogin(const nsAString & aHostname,
-                                        const nsAString & aActionURL) {
+				const nsAString & aActionURL,
+				const nsAString & aHttpRealm) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::TryToEnableBulkLogin() Called") );
 
 	PRUint32 count;
 	nsILoginInfo **logins;
-	nsresult res = FindBulkLogins( &count, aHostname, aActionURL, NS_ConvertUTF8toUTF16( "*" ), &logins );
+	nsresult res = FindBulkLogins( &count, aHostname, aActionURL, aHttpRealm, &logins );
 	NS_ENSURE_SUCCESS(res, res);
 
 	PRUint32 i;
 	for( i = 0; i < count; i++ ) {
-		res = RemoveBulkLogin( logins[i] );
+		nsAutoString aHttpRealm;
+		logins[i]->GetHttpRealm(aHttpRealm);
+		if( aHttpRealm.IsVoid() )
+			res = AddFormLogin( logins[i] );
+		else 
+			res = AddRealmLogin( logins[i] );
 		NS_ENSURE_SUCCESS(res, res);
-		
-		res = AddFormLogin( logins[i] );
+
+		res = RemoveBulkLogin( logins[i] );
 		NS_ENSURE_SUCCESS(res, res);
 	}
 	
@@ -1189,14 +1184,14 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
                                         const nsAString & aHttpRealm,
                                         PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() Called") );
-	
+
+	TryToEnableBulkLogin( aHostname, aActionURL, aHttpRealm );
+
 	if( aActionURL.IsVoid() )
 		return CountRealmLogins( aHostname, aHttpRealm, _retval );
 	
-	if( aHttpRealm.IsVoid() ) {
-		TryToEnableBulkLogin( aHostname, aActionURL );
+	if( aHttpRealm.IsVoid() )
 		return CountFormLogins( _retval );
-	}
 
 	NS_ERROR("CountLogins must set aActionURL or aHttpRealm");
 	return NS_ERROR_FAILURE;
@@ -1376,12 +1371,12 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 
 NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
-	
+
 	nsAutoString aActionURL;
 	aLogin->GetFormSubmitURL(aActionURL);
 	if( aActionURL.IsVoid() )
 		return AddRealmLogin( aLogin );
-	
+
 	nsAutoString aHttpRealm;
 	aLogin->GetHttpRealm(aHttpRealm);
 	if( aHttpRealm.IsVoid() )
