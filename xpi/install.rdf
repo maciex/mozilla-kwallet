@@ -4,7 +4,7 @@
     <em:id>kwallet@guillermo.molina</em:id>
     <em:type>2</em:type>
     <em:name>KDE Wallet password integration</em:name>
-    <em:version>0.6</em:version>
+    <em:version>0.6.1</em:version>
     <em:creator>Guillermo Adrian Molina</em:creator>
     <em:contributor>Javier Llorente</em:contributor>
     <em:description>This extension enable passwords and form logins to be stored in KDE Wallet</em:description>

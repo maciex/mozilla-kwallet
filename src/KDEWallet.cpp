@@ -1334,15 +1334,18 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 	QString url;
 	res = GetURL( url );
 	NS_ENSURE_SUCCESS(res, res);
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() url: %s", url.toUtf8().data() ) );
 
 	QString key = url; 
 	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() url: %s", url.toUtf8().data() ) );
+
 	// Firefox does not end URLs with /, we should add it
 	if( key.count( "/" ) < 3 )
 		key += "/";
 	
 	key += "#" + formName;
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() key: %s", key.toUtf8().data() ) );
 
 	/* The first login goes to Form Data, others go to Firefox folder */
 	if( count ) {

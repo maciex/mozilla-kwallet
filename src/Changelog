@@ -1,3 +1,7 @@
+Version 0.6.1:
+
+    * Corrected a bug wich prevented correct form name in hash
+
 Version 0.6:
 
     * Form pasword info is stored natively, share passwords with konqueror
