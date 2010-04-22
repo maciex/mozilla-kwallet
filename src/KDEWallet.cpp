@@ -295,6 +295,9 @@ NS_IMETHODIMP GetURL( QString & qsurl ) {
 	NS_ENSURE_SUCCESS(res, res);
 
 	qsurl = NSString2QtString( url );
+	
+	qsurl = qsurl.section( '?', 0, 0 ).section( '#', 0, 0 ).section( ';', 0, 0 );
+	
 	return NS_OK;
 }  
 
