@@ -1148,8 +1148,8 @@ NS_IMETHODIMP CountFormLogins( const nsAString & aHostname, PRUint32 *_retval) {
 	QStringList formNames;
 	QStringList passwordNames;
 	QString qHostname = NSString2QtString( aHostname );
-	nsresult res = AddFormsAndPasswordsNamesFor( qHostname );
-	NS_ENSURE_SUCCESS(res, res);
+/*	nsresult res = AddFormsAndPasswordsNamesFor( qHostname );
+	NS_ENSURE_SUCCESS(res, res);*/
 	QList< QPair< QString /*Form Name */ ,QString /*Password field name */ > > formsAndPasswords = GetFormsAndPasswordsNamesFor( qHostname );
 	QString url = GetUrlFor( qHostname );
 
@@ -1159,7 +1159,7 @@ NS_IMETHODIMP CountFormLogins( const nsAString & aHostname, PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountFormLogins() form count: %d", formsAndPasswords.size() ) );	
 	for( int i = 0; i < formsAndPasswords.size(); i++) {
 		/* First we find in folder: Form Data */
-		res = selectFormDataFolder();
+		nsresult res = selectFormDataFolder();
 		NS_ENSURE_SUCCESS(res, res);
 		
 		QString key = url; 
@@ -1240,13 +1240,19 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
                                         PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() Called") );
 
-	TryToEnableBulkLogin( aHostname, aActionURL, aHttpRealm );
 
-	if( aActionURL.IsVoid() )
+	if( aActionURL.IsVoid() ) {
+		TryToEnableBulkLogin( aHostname, aActionURL, aHttpRealm );  
 		return CountRealmLogins( aHostname, aHttpRealm, _retval );
+	}
 	
-	if( aHttpRealm.IsVoid() )
+	if( aHttpRealm.IsVoid() ) {	  
+		QString qHostname = NSString2QtString( aHostname );
+		nsresult res = AddFormsAndPasswordsNamesFor( qHostname );
+		NS_ENSURE_SUCCESS(res, res);
+		TryToEnableBulkLogin( aHostname, aActionURL, aHttpRealm );
 		return CountFormLogins( aHostname, _retval );
+	}
 
 	NS_ERROR("CountLogins must set aActionURL or aHttpRealm");
 	return NS_ERROR_FAILURE;
@@ -1344,6 +1350,10 @@ NS_IMETHODIMP AddBulkLogin(nsILoginInfo *aLogin) {
 		NS_ERROR("Can not save map information");
 		return NS_ERROR_FAILURE;
 	}
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddBulkLogin() hostname: %s", entry[ kHostnameAttr ].toUtf8().data() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddBulkLogin() username: %s", entry[ kUsernameAttr ].toUtf8().data() ) );
+
 	return NS_OK;
 }
 
@@ -1368,14 +1378,22 @@ NS_IMETHODIMP AddFormLogin(nsILoginInfo *aLogin) {
 	aLogin->GetPasswordField(aPasswordField);
 	QString passwordField = NSString2QtString(aPasswordField);
 
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() Password field: %s", passwordField.toUtf8().data() ) );
+
 	QString formName;
+	int i;
 	// Select the form we are saving
-	for( int i = 0; i < formsAndPasswords.size(); i++) {
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() form name[%i]: %s", i, formsAndPasswords[i].second.toUtf8().data() ) );
+	for( i = 0; i < formsAndPasswords.size(); i++) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() form name[%i]: %s", i, formsAndPasswords[i].first.toUtf8().data() ) );
 		if( formsAndPasswords[i].second == passwordField ) {
 			formName = formsAndPasswords[i].first;
 			break;
 		}
+	}
+	
+	if( i == formsAndPasswords.size() ) {
+		NS_ERROR("Colud not locate form");
+		return NS_ERROR_FAILURE;
 	}
 
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddFormLogin() form name: %s", formName.toUtf8().data() ) );
