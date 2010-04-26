@@ -1,3 +1,9 @@
+Version 0.6.2:
+
+    * Changed internal algorithm, now it uses doc info available at count
+    time, instead of at add time (it proved to be outdated info most of the
+    time)
+
 Version 0.6.1:
 
     * Corrected a bug wich prevented correct form name in hash

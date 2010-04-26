@@ -9,7 +9,7 @@ DEPENDENCY_CFLAGS = `pkg-config --cflags libxul libxul-unstable`
 #KDE_CFLAGS = -I/usr/include/kde
 KDE_LDFLAGS = -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul libxul-unstable`
-VERSION = 0.6.1
+VERSION = 0.6.2
 FILES = KDEWallet.cpp 
 
 BUILD_DIR = ../build
