@@ -1,3 +1,8 @@
+Version 0.7:
+
+    * Removed konqueror/rekonq compatibility
+    * Added Firefox 4.0 compatibility
+
 Version 0.6.2:
 
     * Changed internal algorithm, now it uses doc info available at count
