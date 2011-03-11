@@ -78,19 +78,68 @@ const char *kPasswordAttr = "password";
 /* Implementation file */
 NS_IMPL_ISUPPORTS1(KDEWallet, nsILoginManagerStorage)
 
-bool checkWallet() {
+NS_IMETHODIMP GetPreference( const char *which, QString &preference ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetPreference() Called") );
+	nsresult res;
+
+	nsCOMPtr<nsIPrefService> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
+	if( prefs == nsnull )
+		return NS_ERROR_FAILURE;
+
+	nsCOMPtr<nsIPrefBranch> branch;
+	res = prefs->GetBranch("extensions.firefox-kde-wallet.", getter_AddRefs(branch));
+	NS_ENSURE_SUCCESS(res, res);
+	if( branch == nsnull )
+		return NS_ERROR_FAILURE;
+
+	char* value = NULL;
+	branch->GetCharPref( which, &value);
+	if (value == NULL)
+		return NS_ERROR_FAILURE;
+
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetPreference() %s=%s", which, value) );
+	preference = QString( value );
+	return NS_OK;
+}
+
+NS_IMETHODIMP checkWallet( void ) {
+	nsresult res;
+	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Called" ) );
 	if( !wallet ) {
-		wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous );
-		if( !wallet )
-			return false;
+		QString walletPref;
+		res = GetPreference( "wallet", walletPref );	
+		NS_ENSURE_SUCCESS(res, res);
+	  
+		if( walletPref == "LocalWallet" )
+			wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::LocalWallet(), 0, KWallet::Wallet::Synchronous );
+		if( walletPref == "NetworkWallet" )
+			wallet =  KWallet::Wallet::openWallet(KWallet::Wallet::NetworkWallet(), 0, KWallet::Wallet::Synchronous );
+		if( !wallet ) {
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Could not open %s", walletPref.toUtf8().data() ) );
+			return NS_ERROR_FAILURE;
+		}
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() %s Opened", walletPref.toUtf8().data() ) );  
 	}
-	if( !wallet->hasFolder("Firefox") ) {
-		if( !wallet->createFolder("Firefox") ) 
-			return false;
+	
+	QString folderPref;
+	res = GetPreference( "folder", folderPref );	
+	NS_ENSURE_SUCCESS(res, res);
+	if( !wallet->hasFolder( folderPref ) ) {
+		if( !wallet->createFolder( folderPref ) ) {
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Could not create folder %s", folderPref.toUtf8().data() ) );
+			return NS_ERROR_FAILURE;
+		}
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Folder %s created", folderPref.toUtf8().data() ) );  
 	}
-	if( !wallet->setFolder("Firefox") )
-		return false;
-	return true;
+	if( !wallet->setFolder( folderPref ) ) {
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Could not select folder %s", folderPref.toUtf8().data() ) );
+		return NS_ERROR_FAILURE;
+	}
+	
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Folder %s selected", folderPref.toUtf8().data() ) );  
+	return NS_OK;
 }
 
 nsAutoString QtString2NSString ( const QString &qtString ) {
@@ -140,10 +189,9 @@ NS_IMETHODIMP KDEWallet::Init() {
 	KCmdLineArgs::init( &aboutData );
 	app = new KApplication(false);
   
-	if( checkWallet() )
-	  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::Init() Wallet opened") );
-	else
-	  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::Init() Wallet not opened") );
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
 	return NS_OK;
 }
 
@@ -153,13 +201,18 @@ NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
     return Init();
 }
 
+// I must define the next function, if not, I get undefined symbol error
+NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
+	NS_ERROR("Should not call this");
+	return NS_ERROR_FAILURE;
+}
+
 NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
   
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
 	nsAutoString s;
 	QMap< QString, QString > entry;
 
@@ -201,10 +254,8 @@ NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveLogin() Called") );
   
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
 
 	nsAutoString aUsername;
 	aLogin->GetUsername(aUsername);
@@ -245,10 +296,9 @@ NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
 
 NS_IMETHODIMP KDEWallet::RemoveAllLogins() {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveAllLogins() Called") );
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
 	
 	QString key = generateQueryWalletKey( NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), 
 					 NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ) );
@@ -278,10 +328,9 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
                                        nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Called") );
 	*count = 0;
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
 	
 	QString key = generateQueryWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
 
@@ -350,10 +399,9 @@ NS_IMETHODIMP KDEWallet::GetAllDisabledHosts(PRUint32 *aCount,
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllDisabledHosts() Called") );
 	*aCount = 0;
 
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
 	QMap< QString, QString > saveDisabledHostMap;
 	wallet->readMap( kSaveDisabledHostsMapName, saveDisabledHostMap );
 	
@@ -386,10 +434,9 @@ NS_IMETHODIMP KDEWallet::GetLoginSavingEnabled(const nsAString & aHost,
                                                   PRBool *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetLoginSavingEnabled() Called") );
   
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
 	QMap< QString, QString > saveDisabledHostMap;
 
 	wallet->readMap( kSaveDisabledHostsMapName, saveDisabledHostMap );
@@ -410,10 +457,9 @@ NS_IMETHODIMP KDEWallet::SetLoginSavingEnabled(const nsAString & aHost,
                                                   PRBool isEnabled) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SetLoginSavingEnabled() Called") );
   
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+
 	QMap< QString, QString > saveDisabledHostMap;
 
 	wallet->readMap( kSaveDisabledHostsMapName, saveDisabledHostMap );
@@ -439,10 +485,9 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
                                         PRUint32 *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::CountLogins() Called") );
 	*_retval = 0;
-	if( !checkWallet() ) {
-		NS_ERROR("Wallet is useless");
-		return NS_ERROR_FAILURE;
-	}
+
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
 	
 	QString key = generateQueryWalletKey( aHostname, aActionURL, aHttpRealm, NS_ConvertUTF8toUTF16( "*" ) );
 

@@ -5,3 +5,4 @@ locale    firefox-kde-wallet   en-US         chrome/locale/en-US/
 
 overlay   chrome://browser/content/browser.xul   chrome://firefox-kde-wallet/content/ff-overlay.xul
 binary-component components/libkdewallet_x86.so abi=Linux_x86-gcc3
+binary-component components/libkdewallet_x86_64.so abi=Linux_x86_64-gcc3
