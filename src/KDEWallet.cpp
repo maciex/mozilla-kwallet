@@ -46,7 +46,6 @@
 #include "KDEWallet.h"
 
 #include "nsILoginInfo.h"
-#include "mozilla/ModuleUtils.h"
 #include "nsMemory.h"
 #include "nsICategoryManager.h"
 #include "nsComponentManagerUtils.h"
@@ -499,32 +498,3 @@ NS_IMETHODIMP KDEWallet::CountLogins(const nsAString & aHostname,
 	*_retval = entryMap.count();
 	return NS_OK;
 }
-
-NS_GENERIC_FACTORY_CONSTRUCTOR(KDEWallet)
-NS_DEFINE_NAMED_CID(KDEWALLET_CID);
-
-static const mozilla::Module::CIDEntry kKDEWalletCIDs[] = {
-    { &kKDEWALLET_CID, false, NULL, KDEWalletConstructor },
-    { NULL }
-};
-
-static const mozilla::Module::ContractIDEntry kKDEWalletContracts[] = {
-    { KDEWALLET_CONTRACTID, &kKDEWALLET_CID },
-    { NULL }
-};
-
-static const mozilla::Module::CategoryEntry kKDEWalletCategories[] = {
-    { "login-manager-storage", "nsILoginManagerStorage", KDEWALLET_CONTRACTID },
-    { NULL }
-};
-
-static const mozilla::Module kKDEWalletModule = {
-    mozilla::Module::kVersion,
-    kKDEWalletCIDs,
-    kKDEWalletContracts,
-    kKDEWalletCategories
-};
-
-NSMODULE_DEFN(nsKDEWalletModule) = &kKDEWalletModule;
-
-NS_IMPL_MOZILLA192_NSGETMODULE(&kKDEWalletModule)
