@@ -34,35 +34,45 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "mozilla/ModuleUtils.h"
+#include "nsIGenericFactory.h"
 #include "KDEWallet.h"
 
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(KDEWallet)
-NS_DEFINE_NAMED_CID(KDEWALLET_CID);
+/* End of implementation class template. */
 
-static const mozilla::Module::CIDEntry kKDEWalletCIDs[] = {
-    { &kKDEWALLET_CID, false, NULL, KDEWalletConstructor },
-    { NULL }
+static NS_METHOD
+KDEWalletRegisterSelf(nsIComponentManager *compMgr, nsIFile *path,
+                         const char *loaderStr, const char *type,
+                         const nsModuleComponentInfo *info) {
+  nsCOMPtr<nsICategoryManager> cat = do_GetService(NS_CATEGORYMANAGER_CONTRACTID);
+  NS_ENSURE_STATE(cat);
+
+  cat->AddCategoryEntry("login-manager-storage", "nsILoginManagerStorage",
+                        kKDEWalletContractID, PR_TRUE, PR_TRUE, nsnull);
+  return NS_OK;
+}
+
+static NS_METHOD
+KDEWalletUnregisterSelf(nsIComponentManager *compMgr, nsIFile *path,
+                           const char *loaderStr,
+                           const nsModuleComponentInfo *info ) {
+  nsCOMPtr<nsICategoryManager> cat = do_GetService(NS_CATEGORYMANAGER_CONTRACTID);
+  NS_ENSURE_STATE(cat);
+
+  cat->DeleteCategoryEntry("login-manager-storage", "nsILoginManagerStorage", PR_TRUE);
+  return NS_OK;
+}
+
+static const nsModuleComponentInfo components[] = {
+  {
+    "KDEWallet",
+    KDEWALLET_CID,
+    kKDEWalletContractID,
+    KDEWalletConstructor,
+    KDEWalletRegisterSelf,
+    KDEWalletUnregisterSelf
+  }
 };
 
-static const mozilla::Module::ContractIDEntry kKDEWalletContracts[] = {
-    { KDEWALLET_CONTRACTID, &kKDEWALLET_CID },
-    { NULL }
-};
-
-static const mozilla::Module::CategoryEntry kKDEWalletCategories[] = {
-    { "login-manager-storage", "nsILoginManagerStorage", KDEWALLET_CONTRACTID },
-    { NULL }
-};
-
-static const mozilla::Module kKDEWalletModule = {
-    mozilla::Module::kVersion,
-    kKDEWalletCIDs,
-    kKDEWalletContracts,
-    kKDEWalletCategories
-};
-
-NSMODULE_DEFN(nsKDEWalletModule) = &kKDEWalletModule;
-
-NS_IMPL_MOZILLA192_NSGETMODULE(&kKDEWalletModule)
+NS_IMPL_NSGETMODULE(KDEWallet, components)
