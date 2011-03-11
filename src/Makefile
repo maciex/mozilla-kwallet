@@ -7,7 +7,7 @@ CPPFLAGS +=     -fno-rtti              \
 
 DEPENDENCY_CFLAGS = `pkg-config --cflags libxul` -DMOZ_NO_MOZALLOC
 KDE_CFLAGS = `pkg-config --cflags QtCore`
-#KDE_LDFLAGS = -lkdeinit4_kwalletd
+KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul`
 VERSION = 0.7
 FILES = KDEWallet.cpp 
@@ -24,8 +24,8 @@ TARGET = libkdewallet_$(ARCH).so
 build-xpi: build-library
 	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' $(XPI_DIR)/install.rdf
 #	sed -i 's/<em:targetPlatform>.*<\/em:targetPlatform>/<em:targetPlatform>Linux_$(ARCH)-gcc3<\/em:targetPlatform>/' $(XPI_DIR)/install.rdf
-	mkdir -p $(XPI_DIR)/component
-	cp $(TARGET) $(XPI_DIR)/component
+	mkdir -p $(XPI_DIR)/components
+	cp $(TARGET) $(XPI_DIR)/components
 	rm -f $(XPI_TARGET)
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip $(XPI_TARGET) -@
 
@@ -38,7 +38,7 @@ build: build-library build-xpi
  
 clean: 
 	rm -f $(TARGET)
-	rm -f $(XPI_DIR)/platform/Linux_$(ARCH)-gcc3/components/$(TARGET)
+	rm -f $(XPI_DIR)/components
 	rm -f $(XPI_TARGET)
 	rm -f $(TARBAL_TARGET)
 

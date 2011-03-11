@@ -15,6 +15,8 @@
         <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id> <!-- Firefox -->
         <em:minVersion>1.5</em:minVersion>
         <em:maxVersion>4.*</em:maxVersion>
+	<em:targetPlatform>Linux_x86-gcc3</em:targetPlatform>
+	<em:targetPlatform>Linux_x86_64-gcc3</em:targetPlatform>
       </Description>
     </em:targetApplication>
   </Description>
