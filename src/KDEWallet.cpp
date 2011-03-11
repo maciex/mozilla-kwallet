@@ -200,12 +200,6 @@ NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
     return Init();
 }
 
-// I must define the next function, if not, I get undefined symbol error
-NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
-	NS_ERROR("Should not call this");
-	return NS_ERROR_FAILURE;
-}
-
 NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
   

@@ -35,8 +35,12 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsIGenericFactory.h"
+#include "nsICategoryManager.h"
+#include "nsComponentManagerUtils.h"
+#include "nsServiceManagerUtils.h"
 #include "KDEWallet.h"
 
+static const char kKDEWalletContractID[] = "@mozilla.org/kde-wallet;1";
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(KDEWallet)
 /* End of implementation class template. */

@@ -37,6 +37,12 @@
 #include "mozilla/ModuleUtils.h"
 #include "KDEWallet.h"
 
+// I must define the next function, if not, I get undefined symbol error
+NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
+	NS_ERROR("Should not call this");
+	return NS_ERROR_FAILURE;
+}
+
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(KDEWallet)
 NS_DEFINE_NAMED_CID(KDEWALLET_CID);
