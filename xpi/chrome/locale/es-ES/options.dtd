@@ -1,0 +1,9 @@
+<!ENTITY prefwindow.title "Preferencias de Firefox-KWallet">
+<!ENTITY pane1.title "Preferencias de Firefox-KWallet">
+<!ENTITY wallet.label "Seleccionar cartera">
+<!ENTITY localwallet.label "Cartera Local">
+<!ENTITY localwallet.accesskey "L">
+<!ENTITY networkwallet.label "Cartera de Red">
+<!ENTITY networkwallet.accesskey "R">
+<!ENTITY folder.label "Seleccionar nombre de carpeta">
+<!ENTITY folder.accesskey "C">
