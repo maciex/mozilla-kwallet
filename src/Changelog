@@ -1,7 +1,8 @@
 Version 0.7:
 
     * Removed konqueror/rekonq compatibility
-    * Added Firefox 4.0 compatibility
+    * Added Firefox 4 compatibility
+    * Added Thunderbird 3 compatibility
 
 Version 0.6.2:
 
