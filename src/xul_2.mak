@@ -14,7 +14,7 @@ FILES = KDEWallet.cpp Xul_2.cpp
 
 BUILD_DIR = ../build
 XPI_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).xpi
-TARBAL_TARGET = ../kde-wallet_password_integration-$(VERSION).tar.gz
+TARBAL_TARGET = kde-wallet_password_integration-$(VERSION).tar.gz
 XPI_DIR = ../xpi
 ARCH := $(shell uname -m)
 # Update the ARCH variable so that the Mozilla architectures are used
@@ -40,8 +40,6 @@ clean:
 	rm -f $(XPI_DIR)/components
 	rm -fr $(XPI_DIR)/platform
 	rm -f $(XPI_TARGET)
-	rm -f $(TARBAL_TARGET)
 
 tarbal:
-	rm -f $(TARBAL_TARGET)
-	cd .. && tar cvf $(TARBAL_TARGET) --exclude '.*'  --exclude '*.so' --exclude 'build' *
+	cd ../.. && rm -f $(TARBAL_TARGET) && tar cvfz $(TARBAL_TARGET) --transform='s,firefox-kde-wallet,kwallet@guillermo.molina,' --exclude '.*'  --exclude '*.so' firefox-kde-wallet
