@@ -15,7 +15,7 @@ FILES = KDEWallet.cpp Xul_1.cpp
 BUILD_DIR = ../build
 TARGET = libkdewallet.so
 XPI_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).xpi
-TARBAL_TARGET = build/kde-wallet_password_integration-$(VERSION).tar.gz
+TARBAL_TARGET = ../kde-wallet_password_integration-$(VERSION).tar.gz
 XPI_DIR = ../xpi
 ARCH := $(shell uname -m)
 # Update the ARCH variable so that the Mozilla architectures are used
