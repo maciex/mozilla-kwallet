@@ -34,12 +34,22 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "mozilla/ModuleUtils.h"
 #include "KDEWallet.h"
+#include "mozilla/ModuleUtils.h"
+#include "nsILoginInfo.h"
+#include "nsMemory.h"
+#include "nsICategoryManager.h"
+#include "nsComponentManagerUtils.h"
+#include "nsStringAPI.h"
+#include "nsIXULAppInfo.h"
+#include "nsXULAppAPI.h"
+#include "nsServiceManagerUtils.h"
+
+extern PRLogModuleInfo *gKDEWalletLog;
 
 // I must define the next function, if not, I get undefined symbol error
 NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
-	PR_LOG("Should not call this");
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetUiBusy() Called") );
 	return NS_OK;
 }
 

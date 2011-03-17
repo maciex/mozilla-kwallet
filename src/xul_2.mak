@@ -5,7 +5,7 @@ CPPFLAGS +=     -fno-rtti              \
 		-shared                \
                 -fPIC
 
-DEPENDENCY_CFLAGS = `pkg-config --cflags libxul` -DMOZ_NO_MOZALLOC
+DEPENDENCY_CFLAGS = -DMOZ_NO_MOZALLOC `pkg-config --cflags libxul` 
 KDE_CFLAGS = `pkg-config --cflags QtCore`
 KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul`
@@ -31,7 +31,7 @@ build-xpi: build-library
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip $(XPI_TARGET) -@
 
 build-library: 
-	$(CXX) $(FILES) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS)
+	$(CXX) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS)  $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS) $(FILES)
 	chmod +x $(TARGET)
 #	strip $(TARGET)
  
