@@ -39,8 +39,8 @@
 
 // I must define the next function, if not, I get undefined symbol error
 NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
-	NS_ERROR("Should not call this");
-	return NS_ERROR_FAILURE;
+	PR_LOG("Should not call this");
+	return NS_OK;
 }
 
 
