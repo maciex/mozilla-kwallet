@@ -8,7 +8,11 @@ CPPFLAGS +=     -fno-rtti              \
 DEPENDENCY_CFLAGS = -DMOZ_NO_MOZALLOC `pkg-config --cflags libxul` 
 KDE_CFLAGS = `pkg-config --cflags QtCore`
 KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
-XUL_LDFLAGS = `pkg-config --libs libxul` /usr/lib/xulrunner-devel-2.0/sdk/lib/libxpcomglue_s_nomozalloc.a
+
+# For 32 bits
+XUL_LDFLAGS = `pkg-config --libs libxul`
+# For 64 bits, something is broken here in Xulrunner:
+#XUL_LDFLAGS = `pkg-config --libs libxul` /usr/lib/xulrunner-devel-2.0/sdk/lib/libxpcomglue_s_nomozalloc.a
 VERSION = 0.7
 FILES = KDEWallet.cpp Xul_2.cpp
 
