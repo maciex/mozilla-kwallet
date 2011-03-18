@@ -8,7 +8,7 @@ CPPFLAGS +=     -fno-rtti              \
 DEPENDENCY_CFLAGS = -DMOZ_NO_MOZALLOC `pkg-config --cflags libxul` 
 KDE_CFLAGS = `pkg-config --cflags QtCore`
 KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
-XUL_LDFLAGS = `pkg-config --libs libxul`
+XUL_LDFLAGS = `pkg-config --libs libxul` /usr/lib/xulrunner-devel-2.0/sdk/lib/libxpcomglue_s_nomozalloc.a
 VERSION = 0.7
 FILES = KDEWallet.cpp Xul_2.cpp
 
@@ -31,8 +31,8 @@ build-xpi: build-library
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip $(XPI_TARGET) -@
 
 build-library: 
-	$(CXX) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(XUL_LDFLAGS) $(CPPFLAGS) $(CXXFLAGS)  $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS) $(FILES)
-	chmod +x $(TARGET)
+	$(CXX) -g -Wall -o $(TARGET) $(DEPENDENCY_CFLAGS) $(CPPFLAGS) $(CXXFLAGS)  $(GECKO_DEFINES) $(KDE_CFLAGS) $(KDE_LDFLAGS) $(DEBUG_FLAGS) $(FILES) $(XUL_LDFLAGS)
+	chmod +x $(TARGET) 
 #	strip $(TARGET)
  
 clean: 
