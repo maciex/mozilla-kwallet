@@ -1,3 +1,8 @@
+Version 0.8:
+
+	* Added Firefox Sync support
+	* Implemented SearchLogins
+
 Version 0.7:
 
     * Removed konqueror/rekonq compatibility

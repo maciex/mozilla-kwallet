@@ -370,21 +370,21 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 }
 
 NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
 	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
 }
 
-NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *count,
-                                         nsIPropertyBag *matchData,
-                                         nsILoginInfo ***logins) {
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() Called") );
-  *count = 0;
-  return NS_OK;
+NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
+                                         nsIPropertyBag *aMatchData,
+                                         nsILoginInfo ***aLogins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() Called") );
+	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
 }
 
 NS_IMETHODIMP KDEWallet::GetAllEncryptedLogins(unsigned int*,
                                                   nsILoginInfo***) {
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllEncryptedLogins() Called") );
-  return NS_ERROR_NOT_IMPLEMENTED;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllEncryptedLogins() Called") );
+	return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP KDEWallet::GetAllDisabledHosts(PRUint32 *aCount,

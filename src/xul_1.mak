@@ -9,7 +9,7 @@ DEPENDENCY_CFLAGS = `pkg-config --cflags libxul`
 KDE_CFLAGS = `pkg-config --cflags QtCore`
 KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul`
-VERSION = 0.7
+VERSION = 0.8
 FILES = KDEWallet.cpp Xul_1.cpp
 
 BUILD_DIR = ../build
