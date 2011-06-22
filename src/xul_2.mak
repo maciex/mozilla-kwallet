@@ -13,7 +13,7 @@ KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
 XUL_LDFLAGS = `pkg-config --libs libxul`
 # For 64 bits, something is broken here in Xulrunner:
 #XUL_LDFLAGS = `pkg-config --libs libxul` /usr/lib/xulrunner-devel-2.0/sdk/lib/libxpcomglue_s_nomozalloc.a
-VERSION = 0.8
+VERSION = 0.9
 FILES = KDEWallet.cpp Xul_2.cpp
 
 BUILD_DIR = ../build
