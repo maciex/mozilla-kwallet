@@ -241,8 +241,9 @@ NS_IMETHODIMP KDEWallet::Init() {
 	return NS_OK;
 }
 
-NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
+
+NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password = 0 ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "AddLoginWithPassword() Called") );
   
 	nsresult res = checkWallet();
 	NS_ENSURE_SUCCESS(res, res);
@@ -254,8 +255,13 @@ NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 	aLogin->GetUsername(aUsername);
 	entry[ kUsernameAttr ] = NSString2QtString(aUsername);
 	
-	aLogin->GetPassword(s);
-	entry[ kPasswordAttr ] = NSString2QtString(s);
+	if( password.isEmpty() ) {
+		aLogin->GetPassword(s);
+		entry[ kPasswordAttr ] = NSString2QtString(s);
+	}
+	else
+		entry[ kPasswordAttr ] = password;
+
 	
 	aLogin->GetUsernameField(s);
 	entry[ kUsernameFieldAttr ] = NSString2QtString(s);
@@ -285,6 +291,13 @@ NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {
 	return NS_OK;
 }
 
+
+NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
+  
+	return AddLoginWithPassword( aLogin );
+}
+
 NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveLogin() Called") );
   
@@ -310,21 +323,64 @@ NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
 
 NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
                                         nsISupports *modLogin) {
-  /* If the second argument is an nsILoginInfo, 
-   * just remove the old login and add the new one */
+	/* If the second argument is an nsILoginInfo, 
+	* just remove the old login and add the new one */
 
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() Called") );
-  nsresult interfaceok;
-  nsCOMPtr<nsILoginInfo> newLogin( do_QueryInterface(modLogin, &interfaceok) );
-  if (interfaceok == NS_OK) {
-    nsresult rv = RemoveLogin(oldLogin);
-    rv |= AddLogin(newLogin);
-  return rv;
-  } /* Otherwise, it has to be an nsIPropertyBag.
-     * Let's get the attributes from the old login, then append the ones 
-     * fetched from the property bag. Gracefully, if an attribute appears
-     * twice in an attribut list, the last value is stored. */
-  return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() Called") );
+	nsresult interfaceok;
+	nsCOMPtr<nsILoginInfo> newLogin( do_QueryInterface(modLogin, &interfaceok) );
+	if (interfaceok == NS_OK) {
+		nsresult rv = RemoveLogin(oldLogin);
+		rv |= AddLogin(newLogin);
+		return rv;
+	} /* Otherwise, it has to be an nsIPropertyBag.
+	  * Let's get the attributes from the old login, then append the ones 
+	  * fetched from the property bag. Gracefully, if an attribute appears
+	  * twice in an attribut list, the last value is stored. */
+	nsCOMPtr<nsIPropertyBag> propBag( do_QueryInterface(modLogin, &interfaceok) );
+	if (interfaceok == NS_OK) {
+		nsCOMPtr<nsISimpleEnumerator> enumerator;
+		nsresult rv = propBag->GetEnumerator(getter_AddRefs(enumerator));
+		NS_ENSURE_SUCCESS(rv, rv);
+
+		nsCOMPtr<nsISupports> sup;
+		nsCOMPtr<nsIProperty> prop;
+		nsAutoString propName;
+		PRBool hasMoreElements;
+		
+		rv = enumerator->HasMoreElements(&hasMoreElements);
+		NS_ENSURE_SUCCESS(rv, rv);
+
+		while( hasMoreElements ) {
+			rv = enumerator->GetNext(getter_AddRefs(sup));                        
+			NS_ENSURE_SUCCESS(rv, rv);
+
+			rv = enumerator->HasMoreElements(&hasMoreElements);
+			NS_ENSURE_SUCCESS(rv, rv);
+			
+			prop = do_QueryInterface(sup, &rv);                                   
+			NS_ENSURE_SUCCESS(rv, rv);
+											      
+			prop->GetName(propName);   
+
+			if( propName.EqualsLiteral("password") ) {
+				nsCOMPtr<nsIVariant> val;
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() change password" ) );
+				prop->GetValue(getter_AddRefs(val));                                  
+				if (!val)                                                           
+					return NS_ERROR_FAILURE;  
+				nsString valueString;
+				
+				rv = val->GetAsDOMString(valueString);
+				NS_ENSURE_SUCCESS(rv, rv);
+				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() password %s", NS_ConvertUTF16toUTF8(valueString).get() ) );
+				return AddLoginWithPassword( oldLogin, NSString2QtString( valueString ) );
+			}
+		}
+		return NS_OK;
+	}
+	NS_ERROR("Dont know how to modify a login with modLogin");
+	return NS_ERROR_FAILURE;  
 }
  
 
