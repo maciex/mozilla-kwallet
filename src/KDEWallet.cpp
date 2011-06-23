@@ -58,7 +58,36 @@
 #include "nsIVariant.h"
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
+#include "mozilla/ModuleUtils.h"
 
+extern PRLogModuleInfo *gKDEWalletLog;
+
+NS_GENERIC_FACTORY_CONSTRUCTOR(KDEWallet)
+NS_DEFINE_NAMED_CID(KDEWALLET_CID);
+
+static const mozilla::Module::CIDEntry kKDEWalletCIDs[] = {
+    { &kKDEWALLET_CID, false, NULL, KDEWalletConstructor },
+    { NULL }
+};
+
+static const mozilla::Module::ContractIDEntry kKDEWalletContracts[] = {
+    { KDEWALLET_CONTRACTID, &kKDEWALLET_CID },
+    { NULL }
+};
+
+static const mozilla::Module::CategoryEntry kKDEWalletCategories[] = {
+    { "login-manager-storage", "nsILoginManagerStorage", KDEWALLET_CONTRACTID },
+    { NULL }
+};
+
+static const mozilla::Module kKDEWalletModule = {
+    mozilla::Module::kVersion,
+    kKDEWalletCIDs,
+    kKDEWalletContracts,
+    kKDEWalletCategories
+};
+
+NSMODULE_DEFN(nsKDEWalletModule) = &kKDEWalletModule;
 PRLogModuleInfo *gKDEWalletLog;
 
 KWallet::Wallet *wallet = NULL; // A pointer to KWallet - it doesn't like be declared over and over inside a function.
@@ -178,9 +207,27 @@ QString generateQueryWalletKey( const nsAString & aHostname,
 	return key;
 }
 
-NS_IMETHODIMP KDEWallet::Init() {
+KDEWallet::KDEWallet() {
 	gKDEWalletLog = PR_NewLogModule("KDEWalletLog");
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::KDEWallet() Called") );
+}
 
+KDEWallet::~KDEWallet() {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::~KDEWallet() Called") );
+}
+
+NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
+                                         nsIFile *aOutputFile) {
+     PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::InitWithFile() Called") );
+     return Init();
+}
+
+NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetUiBusy() Called") );
+	return NS_OK;
+}
+
+NS_IMETHODIMP KDEWallet::Init() {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::Init() Called") );
   
 	/* KWallet requries a functioning KApplication or it will segfault */
@@ -192,12 +239,6 @@ NS_IMETHODIMP KDEWallet::Init() {
 	NS_ENSURE_SUCCESS(res, res);
 
 	return NS_OK;
-}
-
-NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
-                                         nsIFile *aOutputFile) {
-  PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::InitWithFile() Called") );
-    return Init();
 }
 
 NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin) {

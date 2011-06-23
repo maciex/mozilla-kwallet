@@ -42,18 +42,20 @@
 #define KDEWALLET_CONTRACTID "@mozilla.org/kde-wallet;1"
 
 #ifdef PR_LOGGING
-// (NSPR_LOG_MODULES=GnomeKeyringLog:5)
+// (NSPR_LOG_MODULES=KDEWalletLog:5)
 extern PRLogModuleInfo *gKDEWalletLog;
 #endif
 #define GK_LOG(args) PR_LOG(gKDEWalletLog, PR_LOG_DEBUG, args)
 #define GK_LOG_ENABLED() PR_LOG_TEST(gKDEWalletLog, PR_LOG_DEBUG)
 
-class KDEWallet : public nsILoginManagerStorage
-{
-  private:
-  
+class KDEWallet : public nsILoginManagerStorage {
 public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSILOGINMANAGERSTORAGE
+  
+  KDEWallet();
+
+private:
+  ~KDEWallet();
 };
  

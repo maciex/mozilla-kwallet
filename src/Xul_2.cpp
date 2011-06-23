@@ -81,4 +81,4 @@ static const mozilla::Module kKDEWalletModule = {
 
 NSMODULE_DEFN(nsKDEWalletModule) = &kKDEWalletModule;
 
-//NS_IMPL_MOZILLA192_NSGETMODULE(&kKDEWalletModule)
+NS_IMPL_MOZILLA192_NSGETMODULE(&kKDEWalletModule)
