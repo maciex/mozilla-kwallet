@@ -44,4 +44,4 @@ clean:
 	rm -f $(XPI_TARGET)
 
 tarbal:
-	cd ../.. && rm -f $(TARBAL_TARGET) && tar cvfz $(TARBAL_TARGET) --transform='s,firefox-kde-wallet,kwallet@guillermo.molina,' --exclude '.*'  --exclude '*.so' firefox-kde-wallet
+	cd ../.. && rm -f $(TARBAL_TARGET) && tar cvfz $(TARBAL_TARGET) --transform='s,firefox-kde-wallet,kwallet@guillermo.molina,' --exclude '.*'  --exclude '*.so' --exclude '*.xpi' firefox-kde-wallet
