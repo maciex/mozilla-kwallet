@@ -1,6 +1,6 @@
 Version 0.9:
 
-    * Removed Firefox 3.x Compatibility
+    * Added Firefox 5.x Compatibility
     * Bug fix: can not change stored passwords
 
 Version 0.8:
