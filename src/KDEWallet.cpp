@@ -440,6 +440,7 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 		iterator.next();
  		QMap< QString, QString > entry = iterator.value();
 		nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
+		NS_ADDREF(loginInfo);
 		if (!loginInfo)
 			return NS_ERROR_FAILURE;
 		nsAutoString temp;
@@ -457,7 +458,7 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 			loginInfo->SetFormSubmitURL(QtString2NSString( entry.value( kFormSubmitURLAttr ) ) );
 		if( entry.contains( kHttpRealmAttr ) ) 
 			loginInfo->SetHttpRealm(QtString2NSString( entry.value( kHttpRealmAttr ) ) );
-		NS_ADDREF(loginInfo);
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Found key: %s", iterator.key().toUtf8().data() ) );
 		array[i] = loginInfo;
 		i++;
 	}	
@@ -475,6 +476,53 @@ NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
                                          nsIPropertyBag *aMatchData,
                                          nsILoginInfo ***aLogins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() Called") );
+	nsCOMPtr<nsISimpleEnumerator> enumerator;
+	nsresult rv = aMatchData->GetEnumerator(getter_AddRefs(enumerator));
+	NS_ENSURE_SUCCESS(rv, rv);
+
+	nsCOMPtr<nsISupports> sup;
+	nsCOMPtr<nsIProperty> prop;
+	nsAutoString propName;
+	PRBool hasMoreElements;
+	
+	rv = enumerator->HasMoreElements(&hasMoreElements);
+	NS_ENSURE_SUCCESS(rv, rv);
+
+	while( hasMoreElements ) {
+		rv = enumerator->GetNext(getter_AddRefs(aMatchData));                        
+		NS_ENSURE_SUCCESS(rv, rv);
+
+		rv = enumerator->HasMoreElements(&hasMoreElements);
+		NS_ENSURE_SUCCESS(rv, rv);
+		
+		prop = do_QueryInterface(sup, &rv);                                   
+		NS_ENSURE_SUCCESS(rv, rv);
+										      
+		prop->GetName(propName);   
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() property %s", NS_ConvertUTF16toUTF8(propName).get() ) );
+		nsCOMPtr<nsIVariant> val;
+		prop->GetValue(getter_AddRefs(val));                                  
+		if (val) {
+			nsString valueString;
+			rv = val->GetAsDOMString(valueString);
+			NS_ENSURE_SUCCESS(rv, rv);
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() value %s", NS_ConvertUTF16toUTF8(valueString).get() ) );  
+		}
+/*
+		if( propName.EqualsLiteral("password") ) {
+			nsCOMPtr<nsIVariant> val;
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() change password" ) );
+			prop->GetValue(getter_AddRefs(val));                                  
+			if (!val)                                                           
+				return NS_ERROR_FAILURE;  
+			nsString valueString;
+			
+			rv = val->GetAsDOMString(valueString);
+			NS_ENSURE_SUCCESS(rv, rv);
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() password %s", NS_ConvertUTF16toUTF8(valueString).get() ) );
+			return AddLoginWithPassword( oldLogin, NSString2QtString( valueString ) );
+		}
+*/	}
 	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
 }
 
