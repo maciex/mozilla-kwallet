@@ -34,6 +34,11 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+
+/* Take a look at:
+  http://www.koders.com/javascript/fid67812568E20E312197ACCE21E6BEC2F560C2CCA8.aspx?s=array#L484
+  */
+
 /* This project is based on previous work made in:
 	firefox gnome keyring extension
 */
@@ -46,6 +51,7 @@
 #include "KDEWallet.h"
 
 #include "nsILoginInfo.h"
+#include "nsILoginMetaInfo.h"
 #include "nsMemory.h"
 #include "nsICategoryManager.h"
 #include "nsComponentManagerUtils.h"
@@ -247,6 +253,14 @@ NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password
   
 	nsresult res = checkWallet();
 	NS_ENSURE_SUCCESS(res, res);
+
+	nsCOMPtr<nsILoginMetaInfo> loginmeta( do_QueryInterface(aLogin, &res) );
+	NS_ENSURE_SUCCESS(res, res);
+
+	nsAutoString aGUID;
+	res = loginmeta->GetGuid(aGUID);
+	NS_ENSURE_SUCCESS(res, res);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLoginWithPassword() guid %s", NS_ConvertUTF16toUTF8(aGUID).get() ) );
 
 	nsAutoString s;
 	QMap< QString, QString > entry;
@@ -489,7 +503,7 @@ NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
 	NS_ENSURE_SUCCESS(rv, rv);
 
 	while( hasMoreElements ) {
-		rv = enumerator->GetNext(getter_AddRefs(aMatchData));                        
+		rv = enumerator->GetNext(getter_AddRefs(sup));
 		NS_ENSURE_SUCCESS(rv, rv);
 
 		rv = enumerator->HasMoreElements(&hasMoreElements);
