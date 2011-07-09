@@ -55,6 +55,7 @@
 #include "nsMemory.h"
 #include "nsICategoryManager.h"
 #include "nsComponentManagerUtils.h"
+#include "nsIUUIDGenerator.h"
 #include "nsStringAPI.h"
 #include "nsIXULAppInfo.h"
 #include "nsXULAppAPI.h"
@@ -108,6 +109,7 @@ const char *kUsernameFieldAttr = "usernameField";
 const char *kPasswordFieldAttr = "passwordField";
 const char *kUsernameAttr = "username";
 const char *kPasswordAttr = "password";
+const char *kGuidAttr = "guid";
 
 /* Implementation file */
 NS_IMPL_ISUPPORTS1(KDEWallet, nsILoginManagerStorage)
@@ -249,18 +251,10 @@ NS_IMETHODIMP KDEWallet::Init() {
 
 
 NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password = 0 ) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "AddLoginWithPassword() Called") );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLoginWithPassword() Called") );
   
 	nsresult res = checkWallet();
 	NS_ENSURE_SUCCESS(res, res);
-
-	nsCOMPtr<nsILoginMetaInfo> loginmeta( do_QueryInterface(aLogin, &res) );
-	NS_ENSURE_SUCCESS(res, res);
-
-	nsAutoString aGUID;
-	res = loginmeta->GetGuid(aGUID);
-	NS_ENSURE_SUCCESS(res, res);
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLoginWithPassword() guid %s", NS_ConvertUTF16toUTF8(aGUID).get() ) );
 
 	nsAutoString s;
 	QMap< QString, QString > entry;
@@ -296,6 +290,30 @@ NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password
 	nsAutoString aHostname;
 	aLogin->GetHostname(aHostname);
 	entry[ kHostnameAttr ] = NSString2QtString(aHostname);
+
+	nsCOMPtr<nsILoginMetaInfo> loginmeta( do_QueryInterface(aLogin, &res) );
+	NS_ENSURE_SUCCESS(res, res);
+	nsAutoString aGUID;
+	res = loginmeta->GetGuid(aGUID);
+	NS_ENSURE_SUCCESS(res, res);
+	
+	if( aGUID.IsEmpty() ) {
+		nsCOMPtr<nsIUUIDGenerator> uuidgen = do_GetService("@mozilla.org/uuid-generator;1", &res);
+		NS_ENSURE_SUCCESS(res, res);
+		nsID GUID;
+		res = uuidgen->GenerateUUIDInPlace(&GUID);
+		NS_ENSURE_SUCCESS(res, res);
+		char GUIDChars[NSID_LENGTH];
+		GUID.ToProvidedString(GUIDChars);
+		QString mGUID(GUIDChars);
+		entry[ kGuidAttr ] = mGUID;
+	}
+	else
+		entry[ kGuidAttr ] = NSString2QtString(aGUID);
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLoginWithPassword() Add login with guid=%s", entry[ kGuidAttr ].toUtf8().data() ) );
+	
+	//TODO: Verify the guid is not already inside de DB !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
 
 	QString key = generateWalletKey( aHostname, aActionURL, aHttpRealm, aUsername );
 	if( wallet->writeMap( key, entry ) ) {
@@ -472,7 +490,14 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 			loginInfo->SetFormSubmitURL(QtString2NSString( entry.value( kFormSubmitURLAttr ) ) );
 		if( entry.contains( kHttpRealmAttr ) ) 
 			loginInfo->SetHttpRealm(QtString2NSString( entry.value( kHttpRealmAttr ) ) );
-		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Found key: %s", iterator.key().toUtf8().data() ) );
+		if( entry.contains( kGuidAttr ) ) {
+			nsCOMPtr<nsILoginMetaInfo> loginmeta( do_QueryInterface(loginInfo, &res) );
+			NS_ENSURE_SUCCESS(res, res);
+			nsAutoString aGUID ;
+			res = loginmeta->SetGuid(QtString2NSString( entry.value( kGuidAttr ) ));
+			NS_ENSURE_SUCCESS(res, res);
+		}
+		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLogins() Found key: %s guid: %s", iterator.key().toUtf8().data(), entry.value( kGuidAttr ).toUtf8().data() ) );
 		array[i] = loginInfo;
 		i++;
 	}	
@@ -484,6 +509,71 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetAllLogins() Called") );
 	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
+}
+
+NS_IMETHODIMP FindLoginWithGUID(PRUint32 *count, 
+								const nsAString & aGUID,
+                                nsILoginInfo ***logins) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Called") );
+	*count = 0;
+
+	nsresult res = checkWallet();
+	NS_ENSURE_SUCCESS(res, res);
+	QString mGUID = NSString2QtString( aGUID );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Trying to find guid %s", mGUID.toUtf8().data() ) );
+	
+	QString key = generateQueryWalletKey( NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ), NS_ConvertUTF8toUTF16( "*" ) );
+
+	QMap< QString, QMap< QString, QString > > entryMap;
+	if( wallet->readMapList( key, entryMap ) != 0 ) 
+		return NS_OK;
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Found %d total maps", entryMap.count() ) );
+	if( entryMap.count() == 0 ) 
+		return NS_OK;
+	QMapIterator< QString, QMap< QString, QString > > iterator(entryMap);
+	while (iterator.hasNext()) {
+		iterator.next();
+ 		QMap< QString, QString > entry = iterator.value();
+		
+		if( entry.contains( kGuidAttr ) && entry.value( kGuidAttr ) == mGUID ) {
+			nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
+			NS_ADDREF(loginInfo);
+			if (!loginInfo)
+				return NS_ERROR_FAILURE;
+			nsAutoString temp;
+			if( entry.contains( kHostnameAttr ) )
+				loginInfo->SetHostname( QtString2NSString( entry.value( kHostnameAttr ) ) );
+			if( entry.contains( kUsernameAttr ) )
+				loginInfo->SetUsername(QtString2NSString( entry.value( kUsernameAttr ) ) );
+			if( entry.contains( kUsernameFieldAttr ) )
+				loginInfo->SetUsernameField(QtString2NSString( entry.value( kUsernameFieldAttr ) ) );
+			if( entry.contains( kPasswordAttr ) )
+				loginInfo->SetPassword(QtString2NSString( entry.value( kPasswordAttr ) ) );
+			if( entry.contains( kPasswordFieldAttr ) )
+				loginInfo->SetPasswordField(QtString2NSString( entry.value( kPasswordFieldAttr ) ) );
+			if( entry.contains( kFormSubmitURLAttr ) )
+				loginInfo->SetFormSubmitURL(QtString2NSString( entry.value( kFormSubmitURLAttr ) ) );
+			if( entry.contains( kHttpRealmAttr ) ) 
+				loginInfo->SetHttpRealm(QtString2NSString( entry.value( kHttpRealmAttr ) ) );
+			nsCOMPtr<nsILoginMetaInfo> loginmeta( do_QueryInterface(loginInfo, &res) );
+			NS_ENSURE_SUCCESS(res, res);
+			nsAutoString aGUID ;
+			res = loginmeta->SetGuid(QtString2NSString( entry.value( kGuidAttr ) ));
+			NS_ENSURE_SUCCESS(res, res);
+
+			nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc(sizeof(nsILoginInfo*));
+			NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
+			memset(array, 0, entryMap.count() * sizeof(nsILoginInfo*));
+
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Found key: %s guid: %s", iterator.key().toUtf8().data(), entry.value( kGuidAttr ).toUtf8().data() ) );
+			array[0] = loginInfo;
+
+			*logins = array;
+			*count = 1;
+			return NS_OK;
+		}		
+	}	
+	return NS_OK;
 }
 
 NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
@@ -516,28 +606,20 @@ NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
 		PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() property %s", NS_ConvertUTF16toUTF8(propName).get() ) );
 		nsCOMPtr<nsIVariant> val;
 		prop->GetValue(getter_AddRefs(val));                                  
+		nsString valueString;
 		if (val) {
-			nsString valueString;
 			rv = val->GetAsDOMString(valueString);
 			NS_ENSURE_SUCCESS(rv, rv);
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() value %s", NS_ConvertUTF16toUTF8(valueString).get() ) );  
 		}
-/*
-		if( propName.EqualsLiteral("password") ) {
-			nsCOMPtr<nsIVariant> val;
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() change password" ) );
-			prop->GetValue(getter_AddRefs(val));                                  
-			if (!val)                                                           
-				return NS_ERROR_FAILURE;  
-			nsString valueString;
-			
-			rv = val->GetAsDOMString(valueString);
-			NS_ENSURE_SUCCESS(rv, rv);
-			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() password %s", NS_ConvertUTF16toUTF8(valueString).get() ) );
-			return AddLoginWithPassword( oldLogin, NSString2QtString( valueString ) );
+
+		if( propName.EqualsLiteral("guid") ) {
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() search by guid" ) );
+			return FindLoginWithGUID( aCount, propName, aLogins);
 		}
-*/	}
-	return FindLogins( aCount, NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), NS_ConvertASCIItoUTF16("*"), aLogins);
+	}
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() I don't know hot to search for %s", NS_ConvertUTF16toUTF8(propName).get() ) );
+	*aCount = 0;
+	return NS_OK;
 }
 
 NS_IMETHODIMP KDEWallet::GetAllEncryptedLogins(unsigned int*,
