@@ -614,7 +614,7 @@ NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
 
 		if( propName.EqualsLiteral("guid") ) {
 			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() search by guid" ) );
-			return FindLoginWithGUID( aCount, propName, aLogins);
+			return FindLoginWithGUID( aCount, valueString, aLogins);
 		}
 	}
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SearchLogins() I don't know hot to search for %s", NS_ConvertUTF16toUTF8(propName).get() ) );
