@@ -1,3 +1,8 @@
+Version 0.10:
+
+    * Added GUID property to logins
+    * Completed Firefox Sync support
+
 Version 0.9:
 
     * Added Firefox 5.x Compatibility

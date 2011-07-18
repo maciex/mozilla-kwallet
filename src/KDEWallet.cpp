@@ -408,6 +408,10 @@ NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
 				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() password %s", NS_ConvertUTF16toUTF8(valueString).get() ) );
 				return AddLoginWithPassword( oldLogin, NSString2QtString( valueString ) );
 			}
+			else {
+				NS_ERROR("Dont know how to modify property" );
+				return NS_ERROR_NOT_IMPLEMENTED;
+			}
 		}
 		return NS_OK;
 	}
