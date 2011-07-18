@@ -250,8 +250,8 @@ NS_IMETHODIMP KDEWallet::Init() {
 }
 
 
-NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password = 0 ) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLoginWithPassword() Called") );
+NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin ) {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
   
 	nsresult res = checkWallet();
 	NS_ENSURE_SUCCESS(res, res);
@@ -263,12 +263,8 @@ NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password
 	aLogin->GetUsername(aUsername);
 	entry[ kUsernameAttr ] = NSString2QtString(aUsername);
 	
-	if( password.isEmpty() ) {
-		aLogin->GetPassword(s);
-		entry[ kPasswordAttr ] = NSString2QtString(s);
-	}
-	else
-		entry[ kPasswordAttr ] = password;
+	aLogin->GetPassword(s);
+	entry[ kPasswordAttr ] = NSString2QtString(s);
 
 	
 	aLogin->GetUsernameField(s);
@@ -310,7 +306,7 @@ NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password
 	}
 	else
 		entry[ kGuidAttr ] = NSString2QtString(aGUID);
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLoginWithPassword() Add login with guid=%s", entry[ kGuidAttr ].toUtf8().data() ) );
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Add login with guid=%s", entry[ kGuidAttr ].toUtf8().data() ) );
 	
 	//TODO: Verify the guid is not already inside de DB !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
@@ -323,12 +319,6 @@ NS_IMETHODIMP AddLoginWithPassword(nsILoginInfo *aLogin, const QString &password
 	return NS_OK;
 }
 
-
-NS_IMETHODIMP KDEWallet::AddLogin(nsILoginInfo *aLogin ) {
-	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::AddLogin() Called") );
-  
-	return AddLoginWithPassword( aLogin );
-}
 
 NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::RemoveLogin() Called") );
@@ -355,24 +345,26 @@ NS_IMETHODIMP KDEWallet::RemoveLogin(nsILoginInfo *aLogin) {
 
 NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
                                         nsISupports *modLogin) {
-	/* If the second argument is an nsILoginInfo, 
-	* just remove the old login and add the new one */
-
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() Called") );
-	nsresult interfaceok;
-	nsCOMPtr<nsILoginInfo> newLogin( do_QueryInterface(modLogin, &interfaceok) );
-	if (interfaceok == NS_OK) {
-		nsresult rv = RemoveLogin(oldLogin);
-		rv |= AddLogin(newLogin);
-		return rv;
-	} /* Otherwise, it has to be an nsIPropertyBag.
+	nsresult rv;
+	nsCOMPtr<nsILoginInfo> newLogin( do_QueryInterface(modLogin, &rv) );
+	if(rv != NS_OK) { 
+	/* Otherwise, it has to be an nsIPropertyBag.
 	  * Let's get the attributes from the old login, then append the ones 
 	  * fetched from the property bag. Gracefully, if an attribute appears
 	  * twice in an attribut list, the last value is stored. */
-	nsCOMPtr<nsIPropertyBag> propBag( do_QueryInterface(modLogin, &interfaceok) );
-	if (interfaceok == NS_OK) {
+		nsCOMPtr<nsILoginInfo> login;
+		rv = oldLogin->Clone( getter_AddRefs(login) );
+		NS_ENSURE_SUCCESS(rv, rv);
+		
+		newLogin = do_QueryInterface(login, &rv);
+		NS_ENSURE_SUCCESS(rv, rv);
+
+		nsCOMPtr<nsIPropertyBag> propBag( do_QueryInterface(modLogin, &rv) );
+		NS_ENSURE_SUCCESS(rv, rv);
+		
 		nsCOMPtr<nsISimpleEnumerator> enumerator;
-		nsresult rv = propBag->GetEnumerator(getter_AddRefs(enumerator));
+		rv = propBag->GetEnumerator(getter_AddRefs(enumerator));
 		NS_ENSURE_SUCCESS(rv, rv);
 
 		nsCOMPtr<nsISupports> sup;
@@ -394,29 +386,44 @@ NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
 			NS_ENSURE_SUCCESS(rv, rv);
 											      
 			prop->GetName(propName);   
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() Modify property: %s", NS_ConvertUTF16toUTF8(propName).get() ) );
+			
+			nsCOMPtr<nsIVariant> val;
+			prop->GetValue(getter_AddRefs(val));                                  
+			if (!val)                                                           
+				return NS_ERROR_FAILURE;  
+			nsString valueString;
+			
+			rv = val->GetAsDOMString(valueString);
+			NS_ENSURE_SUCCESS(rv, rv);
 
-			if( propName.EqualsLiteral("password") ) {
-				nsCOMPtr<nsIVariant> val;
-				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() change password" ) );
-				prop->GetValue(getter_AddRefs(val));                                  
-				if (!val)                                                           
-					return NS_ERROR_FAILURE;  
-				nsString valueString;
-				
-				rv = val->GetAsDOMString(valueString);
+			if( propName.EqualsLiteral( kHostnameAttr ) )
+				newLogin->SetHostname( valueString );
+			if( propName.EqualsLiteral( kUsernameAttr ) )
+				newLogin->SetUsername( valueString );
+			if( propName.EqualsLiteral( kUsernameFieldAttr ) )
+				newLogin->SetUsernameField( valueString );
+			if( propName.EqualsLiteral( kPasswordAttr ) )
+				newLogin->SetPassword( valueString );
+			if( propName.EqualsLiteral( kPasswordFieldAttr ) )
+				newLogin->SetPasswordField( valueString );
+			if( propName.EqualsLiteral( kFormSubmitURLAttr ) )
+				newLogin->SetFormSubmitURL( valueString );
+			if( propName.EqualsLiteral( kHttpRealmAttr ) )
+				newLogin->SetHttpRealm( valueString );
+			
+			if( propName.EqualsLiteral( kGuidAttr ) ) {
+				nsCOMPtr<nsILoginMetaInfo> loginmeta( do_QueryInterface(newLogin, &rv) );
 				NS_ENSURE_SUCCESS(rv, rv);
-				PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::ModifyLogin() password %s", NS_ConvertUTF16toUTF8(valueString).get() ) );
-				return AddLoginWithPassword( oldLogin, NSString2QtString( valueString ) );
-			}
-			else {
-				NS_ERROR("Dont know how to modify property" );
-				return NS_ERROR_NOT_IMPLEMENTED;
+				nsAutoString aGUID ;
+				rv = loginmeta->SetGuid( valueString );
+				NS_ENSURE_SUCCESS(rv, rv);
 			}
 		}
-		return NS_OK;
 	}
-	NS_ERROR("Dont know how to modify a login with modLogin");
-	return NS_ERROR_FAILURE;  
+	rv = RemoveLogin(oldLogin);
+	NS_ENSURE_SUCCESS(rv, rv);
+	return AddLogin(newLogin);
 }
  
 
@@ -516,7 +523,7 @@ NS_IMETHODIMP KDEWallet::GetAllLogins(PRUint32 *aCount, nsILoginInfo ***aLogins)
 }
 
 NS_IMETHODIMP FindLoginWithGUID(PRUint32 *count, 
-								const nsAString & aGUID,
+				const nsAString & aGUID,
                                 nsILoginInfo ***logins) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Called") );
 	*count = 0;
@@ -567,7 +574,7 @@ NS_IMETHODIMP FindLoginWithGUID(PRUint32 *count,
 
 			nsILoginInfo **array = (nsILoginInfo**) nsMemory::Alloc(sizeof(nsILoginInfo*));
 			NS_ENSURE_TRUE(array, NS_ERROR_OUT_OF_MEMORY);
-			memset(array, 0, entryMap.count() * sizeof(nsILoginInfo*));
+			memset(array, 0, sizeof(nsILoginInfo*));
 
 			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Found key: %s guid: %s", iterator.key().toUtf8().data(), entry.value( kGuidAttr ).toUtf8().data() ) );
 			array[0] = loginInfo;
@@ -575,7 +582,24 @@ NS_IMETHODIMP FindLoginWithGUID(PRUint32 *count,
 			*logins = array;
 			*count = 1;
 			return NS_OK;
-		}		
+		}
+		
+		if( !entry.contains( kGuidAttr ) ) {
+			nsCOMPtr<nsIUUIDGenerator> uuidgen = do_GetService("@mozilla.org/uuid-generator;1", &res);
+			NS_ENSURE_SUCCESS(res, res);
+			nsID GUID;
+			res = uuidgen->GenerateUUIDInPlace(&GUID);
+			NS_ENSURE_SUCCESS(res, res);
+			char GUIDChars[NSID_LENGTH];
+			GUID.ToProvidedString(GUIDChars);
+			QString mGUID(GUIDChars);
+			entry[ kGuidAttr ] = mGUID;
+			PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::FindLoginWithGUID() Add guid %s to key: %s", mGUID.toUtf8().data(), iterator.key().toUtf8().data() ) );
+			if( wallet->writeMap( iterator.key(), entry ) ) {
+				NS_ERROR("Can not save map information");
+				return NS_ERROR_FAILURE;
+			}
+		}
 	}	
 	return NS_OK;
 }
