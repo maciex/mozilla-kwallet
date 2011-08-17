@@ -5,7 +5,7 @@
     <em:unpack>true</em:unpack>
     <em:type>2</em:type>
     <em:name>KDE Wallet password integration</em:name>
-    <em:version>0.10</em:version>
+    <em:version>0.11</em:version>
     <em:creator>Guillermo Adrian Molina</em:creator>
     <em:description>This extension enable passwords and form logins to be stored in KDE Wallet</em:description>
     <em:aboutURL>chrome://firefox-kde-wallet/content/about.xul</em:aboutURL>
@@ -13,15 +13,15 @@
     <em:targetApplication>
       <Description>
         <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id> <!-- Firefox -->
-        <em:minVersion>4.0</em:minVersion>
-        <em:maxVersion>5.*</em:maxVersion>
+        <em:minVersion>6.0</em:minVersion>
+        <em:maxVersion>6.*</em:maxVersion>
       </Description>
     </em:targetApplication>
     <em:targetApplication>
       <Description>
         <em:id>{3550f703-e582-4d05-9a08-453d09bdfdc6}</em:id> <!-- Thunderbird -->
         <em:minVersion>3.0</em:minVersion>
-        <em:maxVersion>5.*</em:maxVersion>
+        <em:maxVersion>6.*</em:maxVersion>
       </Description>
     </em:targetApplication>
 	<em:targetPlatform>Linux_x86-gcc3</em:targetPlatform>

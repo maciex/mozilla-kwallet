@@ -3,7 +3,8 @@ DEBUG_FLAGS = -DDEBUG
 CPPFLAGS +=     -fno-rtti              \
 		-fno-exceptions        \
 		-shared                \
-                -fPIC
+                -fPIC                  \
+		-std=c++0x
 
 DEPENDENCY_CFLAGS = -DMOZ_NO_MOZALLOC `pkg-config --cflags libxul` 
 #DEPENDENCY_CFLAGS = `pkg-config --cflags libxul` 
@@ -11,7 +12,7 @@ KDE_CFLAGS = `pkg-config --cflags QtCore`
 KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
 
 XUL_LDFLAGS = `pkg-config --libs libxul`
-VERSION = 0.10
+VERSION = 0.11
 FILES = KDEWallet.cpp
 
 BUILD_DIR = ../build
