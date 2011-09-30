@@ -12,7 +12,7 @@ KDE_CFLAGS = `pkg-config --cflags QtCore`
 KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
 
 XUL_LDFLAGS = `pkg-config --libs libxul`
-VERSION = 0.11
+VERSION = 0.12
 FILES = KDEWallet.cpp
 
 BUILD_DIR = ../build
