@@ -1,0 +1,9 @@
+<!ENTITY prefwindow.title "Firefox-KWallet Einstellungen">
+<!ENTITY pane1.title "Firefox-KWallet Einstellungen">
+<!ENTITY wallet.label "Brieftasche wählen">
+<!ENTITY localwallet.label "Lokale Brieftasche">
+<!ENTITY localwallet.accesskey "L">
+<!ENTITY networkwallet.label "Netzwerk Brieftasche">
+<!ENTITY networkwallet.accesskey "N">
+<!ENTITY folder.label "Ordnernamen auswählen">
+<!ENTITY folder.accesskey "O">
