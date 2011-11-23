@@ -1,17 +1,17 @@
 CXX   = g++
-LXX   = ld
 DEBUG_FLAGS = -DDEBUG
-CPPFLAGS +=     -fno-rtti              \
+CXX_CFLAGS +=     -fno-rtti              \
 		-fno-exceptions        \
 		-shared                \
                 -fPIC                  \
 		-std=c++0x
 
-DEPENDENCY_CFLAGS = -DMOZ_NO_MOZALLOC `pkg-config --cflags libxul` 
-KDE_CFLAGS = `pkg-config --cflags QtCore`
-KDE_LDFLAGS = -L/usr/lib/kde4/libkdeinit -lkdeinit4_kwalletd
-
+XUL_CFLAGS = -DMOZ_NO_MOZALLOC `pkg-config --cflags libxul` 
 XUL_LDFLAGS = `pkg-config --libs libxul`
+
+KDE_CFLAGS = `pkg-config --cflags QtCore`
+KDE_LDFLAGS = -lkdeinit4_kwalletd
+
 VERSION = 1.0.8
 FILES = KDEWallet.cpp
 
@@ -33,16 +33,14 @@ build-xpi: build-library
 	rm -f $(XPI_TARGET)
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip $(XPI_TARGET) -@
 
-build-library: KDEWallet.o
-	$(LXX) KDEWallet.o -shared -g -o $(TARGET) $(KDE_LDFLAGS) $(XUL_LDFLAGS)
+build-library: 
+	$(CXX) -c KDEWallet.cpp -g $(XUL_CFLAGS) $(CXX_CFLAGS) $(KDE_CFLAGS) $(DEBUG_FLAGS)
+	ld -o $(TARGET) $(XUL_LDFLAGS) $(KDE_LDFLAGS) -shared
 	chmod +x $(TARGET) 
-#	strip $(TARGET)
-
-KDEWallet.o: KDEWallet.cpp
-	$(CXX) KDEWallet.cpp -c -g -Wall -o KDEWallet.o $(DEPENDENCY_CFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(KDE_CFLAGS) $(GECKO_DEFINES) $(DEBUG_FLAGS)
 
 clean: 
 	rm -f $(TARGET)
+	rm -f KDEWallet.o
 	rm -f $(XPI_DIR)/components
 	rm -fr $(XPI_DIR)/platform
 	rm -f $(XPI_TARGET)
