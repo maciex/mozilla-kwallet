@@ -2,7 +2,7 @@ VERSION = 1.0.8
 
 BUILD_DIR = build
 XPI_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).xpi
-TARBAL_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).tar.gz
+TARBAL_TARGET = kde-wallet_password_integration-$(VERSION).tar.gz
 XPI_DIR = xpi
 ARCH := $(shell uname -m)
 # Update the ARCH variable so that the Mozilla architectures are used
@@ -11,12 +11,16 @@ LIBNAME = libkdewallet_$(ARCH).so
 SOURCE = $(BUILD_DIR)/lib/libkdewallet.so
 TARGET_DIR = $(XPI_DIR)/components
 
-build: $(XPI_TARGET)
+build: copy archive
 
-$(XPI_TARGET): $(TARGET)
-	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' $(XPI_DIR)/install.rdf
+archive: $(XPI_TARGET)
+
+copy: $(SOURCE)
 	mkdir -p $(TARGET_DIR)
 	cp $(SOURCE) $(TARGET_DIR)/$(LIBNAME)
+
+$(XPI_TARGET): 
+	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' $(XPI_DIR)/install.rdf
 	rm -f $(XPI_TARGET)
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip ../$(XPI_TARGET) -@
 
