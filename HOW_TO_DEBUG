@@ -1,0 +1,8 @@
+remove # in DEBUG_FLAGS
+
+Plugin output:
+NSPR_LOG_MODULES=KDEWalletLog:5 firefox
+
+
+Module Loader output:
+NSPR_LOG_MODULES=nsNativeModuleLoader:5 firefox
