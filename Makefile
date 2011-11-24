@@ -1,7 +1,7 @@
 VERSION = 1.0.8
 
 BUILD_DIR = build
-XPI_TARGET = $(BUILD_DIR)/kde-wallet_password_integration-$(VERSION).xpi
+XPI_TARGET = kde-wallet_password_integration-$(VERSION).xpi
 TARBAL_TARGET = kde-wallet_password_integration-$(VERSION).tar.gz
 XPI_DIR = xpi
 ARCH := $(shell uname -m)
@@ -22,11 +22,12 @@ copy: $(SOURCE)
 $(XPI_TARGET): 
 	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' $(XPI_DIR)/install.rdf
 	rm -f $(XPI_TARGET)
-	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip ../$(XPI_TARGET) -@
+	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip ../../$(XPI_TARGET) -@
+
+tarbal: clean
+	cd .. && tar cvfz $(TARBAL_TARGET) --transform='s,firefox-kde-wallet,kwallet@guillermo.molina,' --exclude $(BUILD_DIR) --exclude '.*'  --exclude '*.so' --exclude '*.xpi' firefox-kde-wallet
 
 clean: 
 	rm -rf $(BUILD_DIR)
 #	rm -f $(TARGET_DIR)/$(LIBNAME)
 
-tarbal:
-	cd .. && tar cvfz $(TARBAL_TARGET) --transform='s,firefox-kde-wallet,kwallet@guillermo.molina,' --exclude $(BUILD_DIR) --exclude '.*'  --exclude '*.so' --exclude '*.xpi' firefox-kde-wallet
