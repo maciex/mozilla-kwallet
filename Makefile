@@ -1,4 +1,5 @@
-VERSION = 1.0.8
+FIREFOX_VERSION = 9
+VERSION = 1.0.$(FIREFOX_VERSION)
 
 BUILD_DIR = build
 XPI_TARGET = kde-wallet_password_integration-$(VERSION).xpi
@@ -21,6 +22,8 @@ copy: $(SOURCE)
 
 $(XPI_TARGET): 
 	sed -i 's/<em:version>.*<\/em:version>/<em:version>$(VERSION)<\/em:version>/' $(XPI_DIR)/install.rdf
+	sed -i 's/<em:minVersion>.*<\/em:minVersion>/<em:minVersion>$(FIREFOX_VERSION).0<\/em:minVersion>/' $(XPI_DIR)/install.rdf
+	sed -i 's/<em:maxVersion>.*<\/em:maxVersion>/<em:maxVersion>$(FIREFOX_VERSION)\.\*<\/em:maxVersion>/' $(XPI_DIR)/install.rdf
 	rm -f $(XPI_TARGET)
 	cd $(XPI_DIR) && find . \( ! -regex '.*/\..*' \) | zip ../../$(XPI_TARGET) -@
 
