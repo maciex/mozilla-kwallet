@@ -3,6 +3,7 @@ skin      firefox-kde-wallet   classic/1.0   chrome/skin/
 locale    firefox-kde-wallet   en-US         chrome/locale/en-US/
 locale    firefox-kde-wallet   es-ES         chrome/locale/es-ES/
 locale    firefox-kde-wallet   de-DE         chrome/locale/de-DE/
+locale    firefox-kde-wallet   fr-FR         chrome/locale/fr-FR/
 
 
 overlay   chrome://browser/content/browser.xul         chrome://firefox-kde-wallet/content/ff-overlay.xul
