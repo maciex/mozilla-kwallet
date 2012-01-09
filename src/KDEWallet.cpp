@@ -483,7 +483,7 @@ NS_IMETHODIMP KDEWallet::FindLogins(PRUint32 *count,
 		iterator.next();
  		QMap< QString, QString > entry = iterator.value();
 		nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
-		NS_ADDREF(loginInfo);
+		NS_ADDREF((nsILoginInfo*) loginInfo);
 		if (!loginInfo)
 			return NS_ERROR_FAILURE;
 		nsAutoString temp;
@@ -548,7 +548,7 @@ NS_IMETHODIMP FindLoginWithGUID(PRUint32 *count,
 		
 		if( entry.contains( kGuidAttr ) && entry.value( kGuidAttr ) == mGUID ) {
 			nsCOMPtr<nsILoginInfo> loginInfo = do_CreateInstance(NS_LOGININFO_CONTRACTID);
-			NS_ADDREF(loginInfo);
+			NS_ADDREF((nsILoginInfo*) loginInfo);
 			if (!loginInfo)
 				return NS_ERROR_FAILURE;
 			nsAutoString temp;
