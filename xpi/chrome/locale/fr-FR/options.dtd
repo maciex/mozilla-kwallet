@@ -1,0 +1,9 @@
+<!ENTITY prefwindow.title "Préférences de Firefox-KWallet">
+<!ENTITY pane1.title "Préférences de Firefox-KWallet">
+<!ENTITY wallet.label "Choix de portefeuille">
+<!ENTITY localwallet.label "Portefeuille Local">
+<!ENTITY localwallet.accesskey "L">
+<!ENTITY networkwallet.label "Portefeuille Réseau">
+<!ENTITY networkwallet.accesskey "R">
+<!ENTITY folder.label "Sélection de Portefeuille">
+<!ENTITY folder.accesskey "p">
