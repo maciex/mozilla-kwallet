@@ -230,7 +230,7 @@ NS_IMETHODIMP KDEWallet::InitWithFile(nsIFile *aInputFile,
      return Init();
 }
 
-NS_IMETHODIMP KDEWallet::GetUiBusy(int *) {
+NS_IMETHODIMP KDEWallet::GetUiBusy(bool *) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetUiBusy() Called") );
 	return NS_OK;
 }
@@ -370,7 +370,7 @@ NS_IMETHODIMP KDEWallet::ModifyLogin(nsILoginInfo *oldLogin,
 		nsCOMPtr<nsISupports> sup;
 		nsCOMPtr<nsIProperty> prop;
 		nsAutoString propName;
-		PRBool hasMoreElements;
+		bool hasMoreElements;
 		
 		rv = enumerator->HasMoreElements(&hasMoreElements);
 		NS_ENSURE_SUCCESS(rv, rv);
@@ -615,7 +615,7 @@ NS_IMETHODIMP KDEWallet::SearchLogins(PRUint32 *aCount,
 	nsCOMPtr<nsISupports> sup;
 	nsCOMPtr<nsIProperty> prop;
 	nsAutoString propName;
-	PRBool hasMoreElements;
+	bool hasMoreElements;
 	
 	rv = enumerator->HasMoreElements(&hasMoreElements);
 	NS_ENSURE_SUCCESS(rv, rv);
@@ -693,7 +693,7 @@ NS_IMETHODIMP KDEWallet::GetAllDisabledHosts(PRUint32 *aCount,
 }
 
 NS_IMETHODIMP KDEWallet::GetLoginSavingEnabled(const nsAString & aHost,
-                                                  PRBool *_retval) {
+                                                  bool *_retval) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::GetLoginSavingEnabled() Called") );
   
 	nsresult res = checkWallet();
@@ -716,7 +716,7 @@ NS_IMETHODIMP KDEWallet::GetLoginSavingEnabled(const nsAString & aHost,
 }
 
 NS_IMETHODIMP KDEWallet::SetLoginSavingEnabled(const nsAString & aHost,
-                                                  PRBool isEnabled) {
+                                                  bool isEnabled) {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::SetLoginSavingEnabled() Called") );
   
 	nsresult res = checkWallet();
