@@ -58,7 +58,7 @@
 #include "nsIUUIDGenerator.h"
 #include "nsStringAPI.h"
 #include "nsIXULAppInfo.h"
-#include "nsXULAppAPI.h"
+#include "nsXPCOMCIDInternal.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIPropertyBag.h"
 #include "nsIProperty.h"
@@ -124,7 +124,7 @@ NS_IMETHODIMP GetPreference( const char *which, QString &preference ) {
 		return NS_ERROR_FAILURE;
 
 	nsCOMPtr<nsIPrefBranch> branch;
-	res = prefs->GetBranch("extensions.firefox-kde-wallet.", getter_AddRefs(branch));
+	res = prefs->GetBranch(KDEWALLET_PREF_BRANCH, getter_AddRefs(branch));
 	NS_ENSURE_SUCCESS(res, res);
 	if( branch == nsnull )
 		return NS_ERROR_FAILURE;
@@ -235,12 +235,78 @@ NS_IMETHODIMP KDEWallet::GetUiBusy(bool *) {
 	return NS_OK;
 }
 
+NS_IMETHODIMP KDEWallet::InitDefaultPreferenceValues() {
+	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::InitDefaultPreferenceValues() Called") );
+
+	nsresult res;
+	nsCOMPtr<nsIPrefService> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID, &res);
+	NS_ENSURE_SUCCESS(res, res);
+	if( prefs == nsnull )
+		return NS_ERROR_FAILURE;
+	
+	nsCOMPtr<nsIPrefBranch> branch;
+	res = prefs->GetBranch(KDEWALLET_PREF_BRANCH, getter_AddRefs(branch));
+	NS_ENSURE_SUCCESS(res, res);
+	if( branch == nsnull )
+		return NS_ERROR_FAILURE;
+
+	bool valueAlreadySet = NULL;
+	res = branch->PrefHasUserValue("folder", &valueAlreadySet);
+	NS_ENSURE_SUCCESS(res, res);
+
+	if (!valueAlreadySet) {
+		switch(mozillaApp) {
+			case Firefox:
+				res = branch->SetCharPref("folder", "Firefox");
+				break;
+			case Thunderbird:
+				res = branch->SetCharPref("folder", "Thunderbird");
+				break;
+			default:
+				res = branch->SetCharPref("folder", "Unknown_Mozilla_App");
+				break;
+		}
+		NS_ENSURE_SUCCESS(res, res);
+	}
+}
+
+nsCString KDEWallet::GetAppID() {
+	nsCString appID;
+	nsCOMPtr<nsIXULAppInfo> xulrun (do_GetService(XULAPPINFO_SERVICE_CONTRACTID));
+	if( nsnull == xulrun )
+		return appID;
+
+	xulrun->GetID(appID);
+	return appID;
+}
+
 NS_IMETHODIMP KDEWallet::Init() {
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::Init() Called") );
-  
+	
+	if (this->GetAppID().Equals(FIREFOX_APP_ID)) {
+		mozillaApp = Firefox;
+	} else if (this->GetAppID().Equals(THUNDERBIRD_APP_ID)) {
+		mozillaApp = Thunderbird;
+	} else {
+		mozillaApp = Unknown;
+	}
+	InitDefaultPreferenceValues();
+	
 	/* KWallet requries a functioning KApplication or it will segfault */
-	KAboutData aboutData("Firefox", NULL, ki18n("Firefox KWallet Plugin"), "" );
-	KCmdLineArgs::init( &aboutData );
+	KAboutData* aboutData = NULL;
+	switch(mozillaApp) {
+		case Firefox:
+			aboutData = new KAboutData("Firefox", NULL, ki18n("Firefox KWallet Plugin"), "" );
+			break;
+		case Thunderbird:
+			aboutData = new KAboutData("Thunderbird", NULL, ki18n("Thunderbird KWallet Plugin"), "" );
+			break;
+		default:
+			aboutData = new KAboutData("Unknown Mozilla Application", NULL, ki18n("Unknown Mozilla Application KWallet Plugin"), "" );
+			break;
+	}
+
+	KCmdLineArgs::init( aboutData );
 	app = new KApplication(false);
   
 	nsresult res = checkWallet();

@@ -34,12 +34,18 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "nsStringAPI.h"
 #include "nsILoginManagerStorage.h"
 
 #define KDEWALLET_CID \
 { 0xda355706, 0x2b26, 0x4682, { 0xbe, 0x76, 0xd6, 0x87, 0x13, 0x12, 0xd3, 0xa1}}
 
 #define KDEWALLET_CONTRACTID "@mozilla.org/kde-wallet;1"
+
+#define KDEWALLET_PREF_BRANCH "extensions.firefox-kde-wallet."
+
+#define FIREFOX_APP_ID		"{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
+#define THUNDERBIRD_APP_ID	"{3550f703-e582-4d05-9a08-453d09bdfdc6}"
 
 #ifdef PR_LOGGING
 // (NSPR_LOG_MODULES=KDEWalletLog:5)
@@ -56,6 +62,16 @@ public:
   KDEWallet();
 
 private:
+  enum MozillaApp {
+	  Firefox,
+	  Thunderbird,
+	  Unknown
+  };
+  MozillaApp mozillaApp = Unknown;
+
+  NS_IMETHODIMP InitDefaultPreferenceValues();
+  nsCString GetAppID();
+  
   ~KDEWallet();
 };
  
