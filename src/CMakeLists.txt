@@ -7,6 +7,8 @@ pkg_check_modules(LIBXUL REQUIRED libxul)
 pkg_check_modules(MOZNSPR REQUIRED mozilla-nspr)
 pkg_check_modules(MOZPLUGIN REQUIRED mozilla-plugin)
 
+set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG")
+
 include_directories($KDE4_INCLUDES} ${QT_INCLUDE_DIR} ${MOZNSPR_INCLUDE_DIRS} ${MOZPLUGIN_INCLUDE_DIRS})
 link_directories(${QT_LIBRARY_DIR} ${LIBXUL_LIBRARY_DIRS})
 set(CMAKE_CXX_FLAGS "")

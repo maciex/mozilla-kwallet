@@ -1,5 +1,6 @@
 FIREFOX_VERSION = 14
-VERSION = 1.$(FIREFOX_VERSION)
+EXT_VERSION= 2
+VERSION = 1.$(FIREFOX_VERSION).$(EXT_VERSION)
 
 BUILD_DIR = build
 XPI_TARGET = kde-wallet_password_integration-$(VERSION)-fx+tb-linux.xpi
