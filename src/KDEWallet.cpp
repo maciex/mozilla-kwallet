@@ -143,7 +143,7 @@ NS_IMETHODIMP checkWallet( void ) {
 	nsresult res;
 	
 	PR_LOG( gKDEWalletLog, PR_LOG_DEBUG, ( "KDEWallet::checkWallet() Called" ) );
-	if( !wallet ) {
+	if( !wallet || !wallet->isOpen() ) {
 		QString walletPref;
 		res = GetPreference( "wallet", walletPref );	
 		NS_ENSURE_SUCCESS(res, res);
