@@ -1,4 +1,14 @@
-KDE Wallet password integration
+
+ Warning
+
+ This code/repository is of an old version of the KWallet Add-On, not supporting KDE 5 and Firefox >= 57.
+ I won't be fixing this to work with latest Firefox.
+ I'm not the main developer of this Add on.
+ 
+ There's also a newer add-on for KDE5, but it also won't work on Firefox 57 without fixing (I'm not even sure if it's possible).  Web site of Add-on can be found here: https://addons.mozilla.org/en-US/firefox/addon/kde5-wallet-password-integrati/  And the home page of the developer: http://www.guillermomolina.com/en/
+ 
+ 
+ KDE Wallet password integration
 
 Firefox stores its passwords internaly, optionally protected by a master password. KDE has its own password manager called KWallet.
 KWallet stores every password in the KDE system, and protects access by a master password. With this extension you are able to use KWallet instead of the default Firefox password manager. It allows tighter integration of Firefox inside KDE.
